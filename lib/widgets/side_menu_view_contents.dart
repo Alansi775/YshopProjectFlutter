@@ -318,7 +318,7 @@ class _SideMenuViewContentsState extends State<SideMenuViewContents> {
                   await authManager.signOut();
                   
                   if (mounted) {
-                    // 🚀 تم تصحيح الخطأ: حذف كلمة const من أمام SignInView
+                    //  تم تصحيح الخطأ: حذف كلمة const من أمام SignInView
                     Navigator.of(context).pushAndRemoveUntil(
                       MaterialPageRoute(builder: (context) => const SignInView()),
                       (Route<dynamic> route) => false,
@@ -328,7 +328,7 @@ class _SideMenuViewContentsState extends State<SideMenuViewContents> {
                   Navigator.of(context).pop(); 
                   // توجيه المستخدم لصفحة تسجيل الدخول
                   Navigator.of(context).push(
-                    // 🚀 تم تصحيح الخطأ: حذف كلمة const من أمام SignInView
+                    //  تم تصحيح الخطأ: حذف كلمة const من أمام SignInView
                     MaterialPageRoute(builder: (context) => const SignInView()),
                   );
                 }
