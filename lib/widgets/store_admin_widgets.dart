@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-// 🚀 استيراد نموذج Product الأصلي لغرض التحويل
+//  استيراد نموذج Product الأصلي لغرض التحويل
 import '../models/product.dart'; 
+import 'package:firebase_auth/firebase_auth.dart';
 
 
 // ----------------------------------------------------------------------
@@ -19,6 +20,7 @@ class ProductS {
   final String storeOwnerEmail; 
   final String storeName; 
   final String storePhone; 
+  final String customerID; 
 
   ProductS({
     required this.id,
@@ -31,6 +33,7 @@ class ProductS {
     required this.storeOwnerEmail,
     required this.storeName,
     required this.storePhone,
+    required this.customerID,
   });
 
   factory ProductS.fromFirestore(Map<String, dynamic> data, String id) {
@@ -45,13 +48,14 @@ class ProductS {
       storeOwnerEmail: data['storeOwnerEmail'] as String? ?? 'unknown@store.com',
       storeName: data['storeName'] as String? ?? 'Unknown Store',
       storePhone: data['storePhone'] as String? ?? 'N/A',
+      customerID: data['customerID'] as String? ?? 'N/A',
     );
   }
 
-  // 🚀 دالة التحويل من Product إلى ProductS (الحل لمشكلة تعارض الأنواع)
+  //  دالة التحويل من Product إلى ProductS (الحل لمشكلة تعارض الأنواع)
   factory ProductS.fromProduct(Product p) {
     return ProductS(
-      // 💡 الحل: نضمن أن p.id لا يكون null باستخدام القيمة الافتراضية 'N/A'
+      //  الحل: نضمن أن p.id لا يكون null باستخدام القيمة الافتراضية 'N/A'
       id: p.id ?? 'N/A', 
       name: p.name,
       description: p.description,
@@ -64,6 +68,7 @@ class ProductS {
       storeOwnerEmail: p.storeOwnerEmail ?? 'N/A',
       storeName: p.storeName,
       storePhone: p.storePhone ?? 'N/A',
+      customerID: FirebaseAuth.instance.currentUser?.uid ?? 'Unknown_Customer_ID', 
     );
   }
 }
@@ -179,7 +184,7 @@ class ProductCardView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 🚀 استخدام Material و InkWell بشكل منفصل للتحكم الكامل في التأثيرات
+    //  استخدام Material و InkWell بشكل منفصل للتحكم الكامل في التأثيرات
     return Material(
       color: Theme.of(context).cardColor,
       borderRadius: BorderRadius.circular(15),
@@ -189,7 +194,7 @@ class ProductCardView extends StatelessWidget {
       child: InkWell(
         onTap: onTap, 
         borderRadius: BorderRadius.circular(15),
-        // 🚀 تحديد لون التظليل ليكون أسود خفيفا أو أزرق داكن لتمييز أنيق
+        //  تحديد لون التظليل ليكون أسود خفيفا أو أزرق داكن لتمييز أنيق
         hoverColor: Colors.blue.withOpacity(0.1), 
         splashColor: Colors.blue.withOpacity(0.2), // عند الضغط
 
@@ -428,7 +433,7 @@ class QuickActionGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 💡 استخدام LayoutBuilder لجعلها Responsive
+    //  استخدام LayoutBuilder لجعلها Responsive
     return LayoutBuilder(
       builder: (context, constraints) {
         // إذا كان العرض كبيرًا، استخدم 5 أعمدة، وإلا عمودين
@@ -437,7 +442,7 @@ class QuickActionGrid extends StatelessWidget {
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
           child: GridView.count(
-            crossAxisCount: crossAxisCount, // 🚀 استخدام عدد الأعمدة التكييفي
+            crossAxisCount: crossAxisCount, //  استخدام عدد الأعمدة التكييفي
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             crossAxisSpacing: 20,
@@ -458,12 +463,12 @@ class QuickActionGrid extends StatelessWidget {
                   icon: Icons.bar_chart,
                   label: "Analytics",
                   color: Colors.purple,
-                  action: onAnalytics), // 🚀 تم ربطها
+                  action: onAnalytics), //  تم ربطها
               ActionButton(
                   icon: Icons.notifications,
                   label: "Notifications",
                   color: Colors.red,
-                  action: onNotifications), // 🚀 تم ربطها
+                  action: onNotifications), //  تم ربطها
               ActionButton(
                   icon: Icons.message,
                   label: "Messages",

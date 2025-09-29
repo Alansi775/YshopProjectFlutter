@@ -11,7 +11,7 @@ import 'chat_view.dart';
 // MARK: - 1. نماذج البيانات (تم تصحيح اسم حقل الوقت)
 //----------------------------------------------------------------------
 
-// 💡 نموذج بيانات المحادثة (Chat)
+//  نموذج بيانات المحادثة (Chat)
 class ChatModel {
   final String id;
   final String productID;
@@ -20,6 +20,7 @@ class ChatModel {
   final String storeOwnerID;
   final String lastMessage;
   final Timestamp lastMessageTime;
+  final String customerID; 
 
   ChatModel({
     required this.id,
@@ -29,6 +30,7 @@ class ChatModel {
     required this.storeOwnerID,
     required this.lastMessage,
     required this.lastMessageTime,
+    required this.customerID,
   });
 
   // 💡 تحويل من Firestore
@@ -41,8 +43,10 @@ class ChatModel {
       productImageUrl: data['productImageUrl'] as String? ?? '',
       storeOwnerID: data['storeOwnerID'] as String? ?? '',
       lastMessage: data['lastMessage'] as String? ?? 'Start a conversation.',
-      // 🚀 التصحيح: استخدام 'timestamp' من Firestore
+      customerID: data['customerID'] as String? ?? '',
+      //  التصحيح: استخدام 'timestamp' من Firestore
       lastMessageTime: data['timestamp'] as Timestamp? ?? Timestamp.now(), 
+      
     );
   }
 }
@@ -67,7 +71,7 @@ class ChatListView extends StatelessWidget {
       appBar: AppBar(
         title: const Text("Customer Messages"),
         centerTitle: true,
-        // 🚀 التصحيح: لون خلفية App Bar أبيض
+        //  التصحيح: لون خلفية App Bar أبيض
         backgroundColor: Colors.white,
         // لون النص والأيقونات يكون اللون الأساسي أو الأسود
         foregroundColor: Theme.of(context).colorScheme.primary, 
@@ -77,7 +81,7 @@ class ChatListView extends StatelessWidget {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: maxWidth),
           child: StreamBuilder<QuerySnapshot>(
-            // 🚀 التصحيح: استخدام حقل 'timestamp' للترتيب
+            //  التصحيح: استخدام حقل 'timestamp' للترتيب
             stream: FirebaseFirestore.instance
                 .collection("chats")
                 .where("storeOwnerID", isEqualTo: storeOwnerID)
@@ -122,12 +126,15 @@ class ChatListView extends StatelessWidget {
                         price: "", description: "", imageUrl: chat.productImageUrl,
                         storeOwnerEmail: chat.storeOwnerID, storeName: "",
                         approved: true, status: "", storePhone: "",
+                        customerID: chat.customerID,
                       );
                       
                       Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (context) => ChatView(
-                            chatID: chat.id,
+                            // 💡 يجب إعادة تكوين الـ chatID بنفس منطق العميل للتأكد من الثبات
+                            // يجب أن نستخرج customerID من وثيقة المحادثة
+                            chatID: chat.id, // سنبقيها chat.id بما أننا وثقنا توحيدها الآن
                             product: product,
                             currentUserID: storeOwnerID, // معرّف صاحب المتجر
                             isStoreOwner: true,

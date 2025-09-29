@@ -53,7 +53,7 @@ class _AddProductViewState extends State<AddProductView> {
     }
   }
 
-  // 🚀 MARK: - Cloudinary Upload Function
+  //  MARK: - Cloudinary Upload Function
   Future<String?> _uploadImageToCloudinary() async {
     if (_pickedImage == null && _pickedXFile == null) return null;
 

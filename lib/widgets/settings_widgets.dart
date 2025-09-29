@@ -33,7 +33,7 @@ class IconTextRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 💡 الوصول إلى لون الأيقونة الافتراضي من الـ Theme
+    //  الوصول إلى لون الأيقونة الافتراضي من الـ Theme
     final iconColor = Theme.of(context).iconTheme.color; 
     // لون النص الثانوي (الذي كان رماديًا فاتحًا)
     final secondaryTextColor = Theme.of(context).textTheme.bodySmall?.color ?? Colors.grey.shade600;
@@ -86,7 +86,7 @@ class LabeledTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 💡 الحصول على ألوان الـ Theme
+    //  الحصول على ألوان الـ Theme
     final iconColor = Theme.of(context).iconTheme.color; 
     // لون خلفية حقل الإدخال (سيكون فاتحًا في الوضع الداكن وعاجيًا في الوضع الفاتح)
     final inputFieldColor = Theme.of(context).inputDecorationTheme.fillColor ?? Theme.of(context).dividerColor.withOpacity(0.5);

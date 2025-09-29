@@ -166,7 +166,7 @@ class _StoreAdminViewState extends State<StoreAdminView> {
         title: const Text("Store Dashboard"),
         centerTitle: true,
         actions: [
-          // 🚀 ربط زر الإعدادات بالدالة الجديدة
+          //  ربط زر الإعدادات بالدالة الجديدة
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: _onSettings,
@@ -188,7 +188,7 @@ class _StoreAdminViewState extends State<StoreAdminView> {
                     children: [
                       HeaderSection(storeName: _storeName, storeIconUrl: _storeIconUrl),
                       QuickActionGrid(
-                        // 🚀 ربط الإجراءات بأحدث الدوال
+                        //  ربط الإجراءات بأحدث الدوال
                         onAddProduct: _onAddProduct,
                         onOrders: _onOrders,
                         onMessages: _onMessages,
@@ -199,7 +199,7 @@ class _StoreAdminViewState extends State<StoreAdminView> {
                       ProductsSection(
                         products: _products, 
                         onDelete: _deleteProduct,
-                        onProductTap: _onProductTap, // 🚀 تمرير دالة النقر على المنتج
+                        onProductTap: _onProductTap, //  تمرير دالة النقر على المنتج
                         crossAxisCount: productCrossAxisCount,
                       ),
                       BottomActionButtons(onLogout: _logout),

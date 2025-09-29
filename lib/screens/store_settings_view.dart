@@ -6,7 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cached_network_image/cached_network_image.dart'; // 🚀 لعرض الأيقونة
+import 'package:cached_network_image/cached_network_image.dart'; //  لعرض الأيقونة
 
 // ⚠️ إعدادات Cloudinary يجب أن تكون متطابقة مع المستخدمة في AddProductView
 const CLOUDINARY_CLOUD_NAME = 'drckarr2l'; 

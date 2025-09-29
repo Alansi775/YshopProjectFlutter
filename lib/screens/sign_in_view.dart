@@ -40,7 +40,7 @@ class _SignInViewState extends State<SignInView> {
   bool _isNewStoreOwner = false;
   bool _showSignUp = false;
   String _message = "";
-  // 💡 تم تعطيلها: لم تعد ضرورية، التوجيه يتم فوراً عبر _navigateToHomeScreen
+  //  تم تعطيلها: لم تعد ضرورية، التوجيه يتم فوراً عبر _navigateToHomeScreen
   bool _userIsLoggedIn = false; 
 
   // MARK: - Lifecycle
@@ -112,7 +112,7 @@ class _SignInViewState extends State<SignInView> {
       return;
     }
   } catch (e) {
-    // 💡 تم تجاهل خطأ الصلاحيات هنا لغرض الاستمرار في فحص الدور التالي
+    //  تم تجاهل خطأ الصلاحيات هنا لغرض الاستمرار في فحص الدور التالي
   }
 
 
@@ -135,7 +135,7 @@ class _SignInViewState extends State<SignInView> {
       }
     }
   } catch (e) {
-    // 💡 تم تجاهل خطأ الصلاحيات هنا لغرض الاستمرار في توجيه العميل
+    //  تم تجاهل خطأ الصلاحيات هنا لغرض الاستمرار في توجيه العميل
   }
 
 
@@ -147,7 +147,7 @@ class _SignInViewState extends State<SignInView> {
   }
 }
   
-  // 💡 تحديث: التحقق من حالة تسجيل الدخول الحالية (عند بدء التشغيل)
+  //  تحديث: التحقق من حالة تسجيل الدخول الحالية (عند بدء التشغيل)
   void _checkAuthState() {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
@@ -556,7 +556,7 @@ class _SignInViewState extends State<SignInView> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white, 
-      // 💡 لا يتم عرض CategoryHomeView هنا بعد الآن
+      //  لا يتم عرض CategoryHomeView هنا بعد الآن
       body: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(

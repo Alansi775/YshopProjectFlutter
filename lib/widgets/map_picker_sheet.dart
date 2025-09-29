@@ -84,7 +84,7 @@ class _MapPickerSheetState extends State<MapPickerSheet> {
     _getInitialCurrentLocation();
   }
 
-  // 🚀 هذه الدالة هي المسؤولة عن تحديد الموقع التلقائي
+  //  هذه الدالة هي المسؤولة عن تحديد الموقع التلقائي
   Future<void> _getInitialCurrentLocation() async {
     // التحقق مما إذا كنا نبدأ من إحداثيات فارغة (0.0، 0.0)
     if (widget.initialCoordinate.latitude == 0.0 && widget.initialCoordinate.longitude == 0.0) {
@@ -96,7 +96,7 @@ class _MapPickerSheetState extends State<MapPickerSheet> {
           setState(() {
             _selectedLocation = newLocation;
           });
-          // 🚀 تحريك الخريطة إلى الموقع الجديد
+          //  تحريك الخريطة إلى الموقع الجديد
           _mapController.move(newLocation, 15); 
           // جلب العنوان وتفعيل زر التأكيد
           _getAddressFromLatLng(newLocation);
@@ -104,7 +104,7 @@ class _MapPickerSheetState extends State<MapPickerSheet> {
       } catch (e) {
         if(mounted) setState(() {
           _mapError = "Could not get current location. Please manually move the map.";
-          _isLoading = false; // 💡 تمكين الزر رغم الخطأ (إذا كان العنوان صالحا)
+          _isLoading = false; //  تمكين الزر رغم الخطأ (إذا كان العنوان صالحا)
         });
         print("Error getting current location: $e");
       }

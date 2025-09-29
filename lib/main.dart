@@ -118,7 +118,7 @@ class MyApp extends StatelessWidget {
       
       debugShowCheckedModeBanner: false, 
       
-      // 🚀 التعديل الحاسم هنا!
+      //  التعديل الحاسم هنا!
       home: StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),
         builder: (context, snapshot) {

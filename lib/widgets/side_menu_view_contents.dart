@@ -337,7 +337,7 @@ class _SideMenuViewContentsState extends State<SideMenuViewContents> {
                 padding: EdgeInsets.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
-              // 🚀 تم تصحيح الخطأ: إضافة الوسيط child
+              //  تم تصحيح الخطأ: إضافة الوسيط child
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(

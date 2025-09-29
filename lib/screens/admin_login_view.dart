@@ -4,12 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'admin_home_view.dart'; // AdminHomeView.dart
 
-// 💡 تعريف الألوان الداكنة لمطابقة SwiftUI .systemGroupedBackground
+//  تعريف الألوان الداكنة لمطابقة SwiftUI .systemGroupedBackground
 const Color kDarkBackground = Color(0xFF1C1C1E);
 const Color kCardBackground = Color(0xFF2C2C2E);
 const Color kPrimaryTextColor = Colors.white;
 
-// 💡 ودجت مُبسطة لمحاكاة تصميم SwiftUI
+//  ودجت مُبسطة لمحاكاة تصميم SwiftUI
 class SimpleTextField extends StatelessWidget {
   final String placeholder;
   final TextEditingController controller;
@@ -120,7 +120,7 @@ class _AdminLoginViewState extends State<AdminLoginView> {
 
   @override
   Widget build(BuildContext context) {
-    // 💡 إعداد النظام ليكون الوضع الداكن (نص شريط الحالة فاتح)
+    //  إعداد النظام ليكون الوضع الداكن (نص شريط الحالة فاتح)
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
 
     return Scaffold(

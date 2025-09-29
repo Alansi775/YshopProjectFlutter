@@ -6,7 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'admin_login_view.dart'; // لاستخدام الدخول الثابت والتصاميم الداكنة
 
-// 💡 تعريف الألوان الداكنة
+//  تعريف الألوان الداكنة
 const Color kDarkBackground = Color(0xFF1C1C1E); // خلفية الشاشة
 const Color kCardBackground = Color(0xFF2C2C2E); // خلفية البطاقات والأقسام
 const Color kAppBarBackground = Color(0xFF1C1C1E); // خلفية شريط التطبيق
@@ -14,7 +14,7 @@ const Color kPrimaryTextColor = Colors.white; // النص الأساسي
 const Color kSecondaryTextColor = Colors.white70; // النص الثانوي/الرمادي
 const Color kSeparatorColor = Color(0xFF48484A); // لون الفاصل/الحدود
 
-// 💡 النماذج (يجب أن تكون في ملف منفصل في بيئة الإنتاج)
+//  النماذج (يجب أن تكون في ملف منفصل في بيئة الإنتاج)
 class ProductSS {
     final String id;
     final String storeName;

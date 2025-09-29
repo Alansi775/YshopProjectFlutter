@@ -9,10 +9,10 @@ class ProductDetailsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 💡 نستخدم عرضًا أقصى لجعل الشاشة تبدو جيدة على الويب
+    //  نستخدم عرضًا أقصى لجعل الشاشة تبدو جيدة على الويب
     const double maxWidth = 700.0;
     
-    // 💡 لون الحالة
+    //  لون الحالة
     Color statusColor = product.approved ? Colors.green : Colors.orange;
 
     return Scaffold(

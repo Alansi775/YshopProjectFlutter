@@ -1,15 +1,14 @@
-// هذي
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:scrollable_positioned_list/scrollable_positioned_list.dart'; // 🚀 للتمرير التلقائي للأسفل
-import 'package:firebase_auth/firebase_auth.dart'; // 💡 لإضافة Firebase Auth
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart'; // للتمرير التلقائي للأسفل
+import 'package:firebase_auth/firebase_auth.dart'; // لإضافة Firebase Auth
 import '../widgets/store_admin_widgets.dart'; // لاستخدام ProductS
 
 //----------------------------------------------------------------------
 // MARK: - نماذج البيانات
 //----------------------------------------------------------------------
 
-// 💡 نموذج بيانات الرسالة (Message)
+//  نموذج بيانات الرسالة (Message)
 class MessageModel {
   final String id;
   final String text;
@@ -29,7 +28,6 @@ class MessageModel {
       id: doc.id,
       text: data['text'] as String? ?? '',
       senderID: data['senderID'] as String? ?? '',
-      // يجب أن يكون 'timestamp' قابلاً للـ null ويتم التعامل معه
       timestamp: data['timestamp'] as Timestamp? ?? Timestamp.now(), 
     );
   }
@@ -42,7 +40,7 @@ class MessageModel {
 class ChatView extends StatefulWidget {
   final String chatID;
   final ProductS product;
-  final String currentUserID; // معرّف صاحب المتجر أو العميل
+  final String currentUserID; // معرّف صاحب المتجر أو العميل (UID أو Email)
   final bool isStoreOwner;
 
   const ChatView({
@@ -59,46 +57,74 @@ class ChatView extends StatefulWidget {
 
 class _ChatViewState extends State<ChatView> {
   final TextEditingController _messageController = TextEditingController();
-  // 🚀 أداة تحكم للتمرير التلقائي
   final ItemScrollController _scrollController = ItemScrollController(); 
   
-  // 💡 مفتاح لتحديد المراسِل (يُفضل استخدام UID إذا كان العميل/المالك يستخدمه)
   bool _isCurrentUser(MessageModel message) {
-    // نعتمد على أن widget.currentUserID هو معرّف فريد (سواء UID أو Email)
     return message.senderID == widget.currentUserID; 
   }
 
   // --------------------------------------------------
-  // MARK: - وظيفة الإرسال (مُعاد تنظيمها)
+  // MARK: - وظيفة الإرسال (التصحيح النهائي والحاسم)
   // --------------------------------------------------
   void _sendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
     
     final messageToSend = text; 
-    _messageController.clear(); // مسح حقل الإدخال فوراً
+    _messageController.clear(); 
 
     final chatRef = FirebaseFirestore.instance.collection("chats").doc(widget.chatID);
+
+    // 1. تحديد المعرّفات بناءً على الدور والقيم المُمررة
     
+    // إذا كنت عميلاً (isStoreOwner=false): finalCustomerID = UID الحالي.
+    // إذا كنت متجراً (isStoreOwner=true): finalCustomerID = customerID المُمرر من ChatListView (وهو UID العميل).
+    final String finalCustomerID = widget.isStoreOwner 
+        ? widget.product.customerID 
+        : widget.currentUserID;     
+
+    // إذا كنت عميلاً (isStoreOwner=false): finalStoreOwnerID = Email المتجر (من بيانات المنتج).
+    // إذا كنت متجراً (isStoreOwner=true): finalStoreOwnerID = Email الحالي للمتجر (currentUserID).
+    final String finalStoreOwnerID = widget.isStoreOwner 
+        ? widget.currentUserID 
+        : widget.product.storeOwnerEmail;
+
+    // 🚨 التحقق النهائي: إذا كان أي من المعرّفين فارغاً، لن نرسل الرسالة (هذا لمنع خطأ الصلاحيات الدائم)
+    if (finalCustomerID.isEmpty || finalStoreOwnerID.isEmpty) {
+        print("Error: CustomerID (${finalCustomerID}) or StoreOwnerID (${finalStoreOwnerID}) is missing.");
+        ScaffoldMessenger.of(context).showSnackBar(
+           const SnackBar(content: Text('Cannot send message: Missing user information.')),
+         );
+       return;
+    }
+
     try {
-        // 1. إضافة الرسالة الجديدة
+        final Timestamp currentTimestamp = Timestamp.now();
+        
+        // 2. تحديث وثيقة المحادثة الرئيسية (لتحافظ على المعرّفات الصحيحة)
+        await chatRef.set({
+          'lastMessage': messageToSend,
+          'timestamp': FieldValue.serverTimestamp(), 
+          'customerID': finalCustomerID, 
+          'storeOwnerID': finalStoreOwnerID,
+          'productName': widget.product.name,
+          'productID': widget.product.id,
+          // 💡 إضافة حقل imageUrl (لتحسين عرض ChatListView)
+          'productImageUrl': widget.product.imageUrl, 
+        }, SetOptions(merge: true));
+
+        // 3. إضافة الرسالة الجديدة
         await chatRef.collection("messages").add({
           'text': messageToSend,
           'senderID': widget.currentUserID, 
-          'timestamp': FieldValue.serverTimestamp(), 
-        });
-
-        // 2. تحديث وثيقة المحادثة الرئيسية بآخر رسالة ووقتها
-        await chatRef.update({
-          'lastMessage': messageToSend,
-          'timestamp': FieldValue.serverTimestamp(), 
+          'timestamp': currentTimestamp, 
         });
 
     } catch (e) {
         print("Error sending message: $e");
         if (mounted) {
            ScaffoldMessenger.of(context).showSnackBar(
-             SnackBar(content: Text('Failed to send message: $e')),
+             SnackBar(content: Text('Failed to send message: ${e.toString()}')),
            );
         }
     }
@@ -121,7 +147,6 @@ class _ChatViewState extends State<ChatView> {
             // 1. قائمة الرسائل (StreamBuilder)
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
-                // 💡 جلب الرسائل بترتيب زمني تصاعدي (الأقدم أولاً)
                 stream: FirebaseFirestore.instance
                     .collection("chats")
                     .doc(widget.chatID)
@@ -130,8 +155,9 @@ class _ChatViewState extends State<ChatView> {
                     .snapshots(),
                 
                 builder: (context, snapshot) {
+                  // 🛑 إذا كان هناك خطأ، اعرضه. هذا هو التحقق من الصلاحيات.
                   if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
+                    return Center(child: Text('Error: ${snapshot.error.toString()}\nCheck Firestore Rules and Chat IDs.'));
                   }
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
@@ -141,12 +167,11 @@ class _ChatViewState extends State<ChatView> {
                       .map((doc) => MessageModel.fromFirestore(doc))
                       .toList();
                   
-                  // 💡 التمرير التلقائي للأسفل إلى الرسالة الأخيرة
-                  // يتم تنفيذه بعد كل تحديث للـ Stream
+                  // التمرير التلقائي للأسفل
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     if (messages.isNotEmpty) {
                       _scrollController.scrollTo(
-                        index: messages.length - 1, // التمرير إلى آخر عنصر
+                        index: messages.length - 1,
                         duration: const Duration(milliseconds: 300),
                         curve: Curves.easeOut,
                         alignment: 0,
@@ -154,12 +179,10 @@ class _ChatViewState extends State<ChatView> {
                     }
                   });
 
-                  // 🚀 استخدام ScrollablePositionedList للعرض السلس
                   return ScrollablePositionedList.builder(
                     itemCount: messages.length,
                     itemScrollController: _scrollController,
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    // نترك reverse: false لأننا نجلب الأقدم أولاً ونستخدم ScrollTo
                     reverse: false, 
                     itemBuilder: (context, index) {
                       final message = messages[index];
@@ -197,7 +220,6 @@ class _ChatViewState extends State<ChatView> {
         Expanded(
           child: TextField(
             controller: _messageController,
-            // 🚀 الإضافة هنا: تشغيل دالة الإرسال عند الضغط على Enter
             onSubmitted: (value) => _sendMessage(), 
             decoration: InputDecoration(
               hintText: "Type a message...",
@@ -243,7 +265,6 @@ class MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // محاذاة الرسالة: اليمين إذا كان المستخدم الحالي، اليسار إذا كان الطرف الآخر
     final alignment = isCurrentUser ? Alignment.centerRight : Alignment.centerLeft;
     final color = isCurrentUser ? Theme.of(context).colorScheme.primary : Colors.grey.shade300;
     final textColor = isCurrentUser ? Colors.white : Colors.black87;
@@ -261,9 +282,7 @@ class MessageBubble extends StatelessWidget {
               borderRadius: BorderRadius.only(
                 topLeft: const Radius.circular(15),
                 topRight: const Radius.circular(15),
-                // زاوية صغيرة حادة لفقاعة المرسل (اليمين)
                 bottomLeft: isCurrentUser ? const Radius.circular(15) : const Radius.circular(3),
-                // زاوية صغيرة حادة لفقاعة المستقبل (اليسار)
                 bottomRight: isCurrentUser ? const Radius.circular(3) : const Radius.circular(15),
               ),
               boxShadow: [
@@ -280,7 +299,7 @@ class MessageBubble extends StatelessWidget {
               style: TextStyle(color: textColor, fontSize: 15),
             ),
           ),
-          // 💡 وقت الرسالة أسفل الفقاعة
+          //  وقت الرسالة أسفل الفقاعة
           Padding(
             padding: const EdgeInsets.only(top: 2, left: 8, right: 8),
             child: Text(
