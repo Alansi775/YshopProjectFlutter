@@ -106,7 +106,7 @@ class _SideMenuViewContentsState extends State<SideMenuViewContents> {
       children: [
         CircleAvatar(
           radius: 28,
-          // 🚨 تحديث: استخدام لون خلفية يتغير مع الـ Theme
+          //  تحديث: استخدام لون خلفية يتغير مع الـ Theme
           backgroundColor: Theme.of(context).dividerColor.withOpacity(0.5),
           child: Icon(Icons.person_rounded, size: 30, color: defaultTextColor.withOpacity(0.7)), 
         ),
@@ -116,14 +116,14 @@ class _SideMenuViewContentsState extends State<SideMenuViewContents> {
           children: [
             Text(
               isLoggedIn ? '$_name $_surname' : 'Welcome Guest',
-              // 🚨 تحديث: تمرير context إلى الدالة
+              //  تحديث: تمرير context إلى الدالة
               style: _getTenorSansStyle(16, weight: FontWeight.w600, context: context),
               overflow: TextOverflow.ellipsis, 
             ),
             const SizedBox(height: 4),
             Text(
               isLoggedIn ? 'Account Settings' : 'Sign In / Register',
-              // 🚨 تحديث: تمرير context إلى الدالة
+              //  تحديث: تمرير context إلى الدالة
               style: _getTenorSansStyle(12, color: Colors.grey, context: context),
             ),
           ],
@@ -143,12 +143,12 @@ class _SideMenuViewContentsState extends State<SideMenuViewContents> {
         height: 32, 
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
-          // 🚨 تحديث: استخدام لون البطاقة
+          //  تحديث: استخدام لون البطاقة
           color: cardColor, 
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              // 🚨 تحديث: استخدام لون الظل من الـ Theme
+              //  تحديث: استخدام لون الظل من الـ Theme
               color: Theme.of(context).shadowColor.withOpacity(0.1),
               blurRadius: 5,
               offset: const Offset(0, 2),
@@ -182,7 +182,7 @@ class _SideMenuViewContentsState extends State<SideMenuViewContents> {
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
                 decoration: BoxDecoration(
-                  // 🚨 تحديث: استخدام الألوان الرئيسية من الـ Theme
+                  //  تحديث: استخدام الألوان الرئيسية من الـ Theme
                   color: isSelected ? Theme.of(context).primaryColor : Colors.transparent, 
                   borderRadius: BorderRadius.circular(20),
                   border: isSelected ? null : Border.all(color: dividerColor, width: 1),
@@ -198,7 +198,7 @@ class _SideMenuViewContentsState extends State<SideMenuViewContents> {
                 ),
                 child: Text(
                   _categoryTabs[index],
-                  // 🚨 تحديث: تمرير context إلى الدالة
+                  //  تحديث: تمرير context إلى الدالة
                   style: _getTenorSansStyle(12, weight: FontWeight.w600, context: context).copyWith(
                     // لون النص يصبح عكس لون الخلفية (أبيض في الداكن، أسود في الفاتح)
                     color: isSelected ? Theme.of(context).colorScheme.background : Theme.of(context).textTheme.bodyLarge?.color,
@@ -223,12 +223,12 @@ class _SideMenuViewContentsState extends State<SideMenuViewContents> {
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
         margin: const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(
-          // 🚨 تحديث: استخدام لون البطاقة
+          //  تحديث: استخدام لون البطاقة
           color: cardColor, 
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              // 🚨 تحديث: استخدام لون الظل
+              //  تحديث: استخدام لون الظل
               color: shadowColor.withOpacity(0.05), 
               blurRadius: 8, 
               offset: const Offset(0, 4),
@@ -239,11 +239,11 @@ class _SideMenuViewContentsState extends State<SideMenuViewContents> {
           children: [
             Text(
               title,
-              // 🚨 تحديث: تمرير context إلى الدالة
+              //  تحديث: تمرير context إلى الدالة
               style: _getTenorSansStyle(15, weight: FontWeight.w500, context: context),
             ),
             const Spacer(),
-            // 🚨 تحديث: أيقونة بلون يتوافق مع الـ Theme
+            //  تحديث: أيقونة بلون يتوافق مع الـ Theme
             Icon(Icons.chevron_right, size: 18, color: Theme.of(context).iconTheme.color?.withOpacity(0.5)),
           ],
         ),
@@ -264,12 +264,12 @@ class _SideMenuViewContentsState extends State<SideMenuViewContents> {
       padding: const EdgeInsets.all(16.0),
       child: Container(
         decoration: BoxDecoration(
-          // 🚨 تحديث: استخدام لون البطاقة
+          //  تحديث: استخدام لون البطاقة
           color: cardColor, 
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              // 🚨 تحديث: استخدام لون الظل
+              //  تحديث: استخدام لون الظل
               color: shadowColor.withOpacity(0.05),
               blurRadius: 10,
               offset: const Offset(0, 5),
@@ -307,7 +307,7 @@ class _SideMenuViewContentsState extends State<SideMenuViewContents> {
             ),
             
             const SizedBox(height: 24),
-            // 🚨 تحديث: استخدام لون الفاصل
+            //  تحديث: استخدام لون الفاصل
             Divider(height: 1, color: dividerColor), 
             const SizedBox(height: 24),
 
@@ -373,24 +373,24 @@ class _SideMenuViewContentsState extends State<SideMenuViewContents> {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          // 🚨 تحديث: استخدام لون خلفية يتغير مع الـ Theme
+          //  تحديث: استخدام لون خلفية يتغير مع الـ Theme
           color: buttonColor,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           children: [
-            // 🚨 تحديث: أيقونة بلون يتوافق مع الـ Theme
+            //  تحديث: أيقونة بلون يتوافق مع الـ Theme
             Icon(icon, size: 24, color: Theme.of(context).iconTheme.color?.withOpacity(0.7)),
             const SizedBox(width: 16),
             Expanded( 
               child: Text(
                 text,
-                // 🚨 تحديث: تمرير context إلى الدالة
+                //  تحديث: تمرير context إلى الدالة
                 style: _getTenorSansStyle(14, context: context).copyWith(color: primaryTextColor),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            // 🚨 تحديث: أيقونة بلون يتوافق مع الـ Theme
+            //  تحديث: أيقونة بلون يتوافق مع الـ Theme
             Icon(Icons.chevron_right, size: 16, color: Theme.of(context).iconTheme.color?.withOpacity(0.5)),
           ],
         ),
@@ -408,7 +408,7 @@ class _SideMenuViewContentsState extends State<SideMenuViewContents> {
     return SizedBox(
       width: menuWidth, 
       child: Container(
-        // 🚨 تحديث: استخدام لون خلفية الـ Scaffold
+        //  تحديث: استخدام لون خلفية الـ Scaffold
         color: scaffoldColor, 
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

@@ -7,7 +7,7 @@ import 'firebase_options.dart';
 import 'screens/sign_in_view.dart'; 
 import 'screens/category_home_view.dart'; // ستبقى مستوردة
 
-// 🚨 التأكد من وجود هذه الملفات في مسار 'lib/state_management/'
+//  التأكد من وجود هذه الملفات في مسار 'lib/state_management/'
 import 'state_management/cart_manager.dart'; 
 import 'state_management/auth_manager.dart'; 
 import 'state_management/theme_manager.dart'; 

@@ -2,7 +2,7 @@
 
 import 'package:flutter/material.dart';
 
-// 🚨 التصحيح الأول: تعديل الدالة لتقبل BuildContext واستخدام لون النص الافتراضي للـ Theme
+//  التصحيح الأول: تعديل الدالة لتقبل BuildContext واستخدام لون النص الافتراضي للـ Theme
 TextStyle _getTenorSansStyle(double size, {FontWeight weight = FontWeight.normal, Color? color, required BuildContext context}) {
   // اللون الافتراضي هو لون النص الأساسي للـ Theme الحالي
   final defaultColor = Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black; 
@@ -42,7 +42,7 @@ class IconTextRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 4.0), // تقليل الـ Padding هنا
       child: Row(
         children: [
-          // 🚨 التصحيح: استخدام لون الأيقونة من الـ Theme
+          //  التصحيح: استخدام لون الأيقونة من الـ Theme
           Icon(icon, color: iconColor?.withOpacity(0.7) ?? Colors.black54, size: 24), 
           const SizedBox(width: 14),
           Column(
@@ -50,12 +50,12 @@ class IconTextRow extends StatelessWidget {
             children: [
               Text(
                 label,
-                // 🚨 التصحيح: تمرير context واستخدام اللون الثانوي
+                //  التصحيح: تمرير context واستخدام اللون الثانوي
                 style: _getTenorSansStyle(12, context: context).copyWith(color: secondaryTextColor),
               ),
               Text(
                 value,
-                // 🚨 التصحيح: تمرير context (سيأخذ لون النص الأساسي للـ Theme)
+                //  التصحيح: تمرير context (سيأخذ لون النص الأساسي للـ Theme)
                 style: _getTenorSansStyle(15, weight: FontWeight.w500, context: context),
               ),
             ],
@@ -94,13 +94,13 @@ class LabeledTextField extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
-        // 🚨 التصحيح: استخدام لون خلفية متوافق مع الـ Theme
+        //  التصحيح: استخدام لون خلفية متوافق مع الـ Theme
         color: inputFieldColor,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
         children: [
-          // 🚨 التصحيح: استخدام لون الأيقونة من الـ Theme
+          //  التصحيح: استخدام لون الأيقونة من الـ Theme
           Icon(icon, color: iconColor?.withOpacity(0.7) ?? Colors.black54, size: 20),
           const SizedBox(width: 12),
           Expanded(
@@ -110,11 +110,11 @@ class LabeledTextField extends StatelessWidget {
               autocorrect: false,
               decoration: InputDecoration(
                 hintText: placeholder,
-                // 🚨 التصحيح: تمرير context إلى الدالة
+                //  التصحيح: تمرير context إلى الدالة
                 hintStyle: _getTenorSansStyle(14, context: context).copyWith(color: Theme.of(context).hintColor),
                 border: InputBorder.none,
               ),
-              // 🚨 التصحيح: تمرير context إلى الدالة
+              //  التصحيح: تمرير context إلى الدالة
               style: _getTenorSansStyle(15, context: context),
             ),
           ),

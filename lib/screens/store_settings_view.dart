@@ -8,7 +8,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cached_network_image/cached_network_image.dart'; //  لعرض الأيقونة
 
-// ⚠️ إعدادات Cloudinary يجب أن تكون متطابقة مع المستخدمة في AddProductView
+//  إعدادات Cloudinary يجب أن تكون متطابقة مع المستخدمة في AddProductView
 const CLOUDINARY_CLOUD_NAME = 'drckarr2l'; 
 const CLOUDINARY_UPLOAD_PRESET = 'ml_default'; 
 
@@ -239,7 +239,7 @@ class _StoreSettingsViewState extends State<StoreSettingsView> {
   }
 
   Widget _buildStoreIconDisplay() {
-    // ⚠️ يتم إعطاء الأولوية للصورة الملتقطة حديثًا
+    //  يتم إعطاء الأولوية للصورة الملتقطة حديثًا
     final Widget imageWidget;
     const double size = 120;
     

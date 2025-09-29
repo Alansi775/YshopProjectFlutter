@@ -5,13 +5,16 @@ import 'package:crypto/crypto.dart';
 import 'dart:convert';
 
 // المكونات المخصصة
-import '../widgets/custom_form_widgets.dart';
-
+import '../widgets/custom_form_widgets.dart'; 
 // استيراد الشاشات الحقيقية
 import 'category_home_view.dart';
 import 'store_admin_view.dart';
-import 'admin_login_view.dart';
+import 'admin_login_view.dart' as Admin;
 import 'admin_home_view.dart'; 
+import '../widgets/welcoming_page_shimmer.dart'; 
+
+// 💡 ملاحظة: يجب أن تكون الألوان (primaryText, accentBlue, secondaryText)
+// معرّفة في ملف custom_form_widgets.dart لتجنب الأخطاء.
 
 class SignInView extends StatefulWidget {
   const SignInView({super.key});
@@ -24,7 +27,6 @@ class _SignInViewState extends State<SignInView> {
   // MARK: - State Variables
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  // ... (بقية الـ Controllers)
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _surnameController = TextEditingController();
   final TextEditingController _storeNameController = TextEditingController();
@@ -40,7 +42,6 @@ class _SignInViewState extends State<SignInView> {
   bool _isNewStoreOwner = false;
   bool _showSignUp = false;
   String _message = "";
-  //  تم تعطيلها: لم تعد ضرورية، التوجيه يتم فوراً عبر _navigateToHomeScreen
   bool _userIsLoggedIn = false; 
 
   // MARK: - Lifecycle
@@ -169,7 +170,7 @@ class _SignInViewState extends State<SignInView> {
       _navigateToHomeScreen(userCredential.user);
       
     } on FirebaseAuthException catch (e) {
-      if (mounted) { // 🚨 تحصين
+      if (mounted) { //  تحصين
         setState(() {
           _message = e.message ?? "An unknown error occurred.";
         });
@@ -191,7 +192,7 @@ class _SignInViewState extends State<SignInView> {
 
         await user.sendEmailVerification();
 
-        if (mounted) { // 🚨 تحصين
+        if (mounted) { //  تحصين
           setState(() {
             _message = "Account created successfully! Please check your email to verify your account.";
           });
@@ -208,13 +209,13 @@ class _SignInViewState extends State<SignInView> {
         });
       }
     } on FirebaseAuthException catch (e) {
-      if (mounted) { // 🚨 تحصين
+      if (mounted) { //  تحصين
         setState(() {
           _message = "Failed to create account: ${e.message}";
         });
       }
     } on FirebaseException catch (e) {
-      if (mounted) { // 🚨 تحصين
+      if (mounted) { //  تحصين
         setState(() {
           _message = "Failed to create user document: ${e.message}";
         });
@@ -235,7 +236,7 @@ class _SignInViewState extends State<SignInView> {
       if (user == null) return;
 
       if (!user.emailVerified) {
-        if (mounted) { // 🚨 تحصين
+        if (mounted) { //  تحصين
           setState(() {
             _message = "Please verify your email before logging in.";
           });
@@ -248,7 +249,7 @@ class _SignInViewState extends State<SignInView> {
       final snapshot = await docRef.get();
 
       if (!snapshot.exists || snapshot.data() == null) {
-        if (mounted) { // 🚨 تحصين
+        if (mounted) { //  تحصين
           setState(() {
             _message = "Store request not found.";
           });
@@ -266,28 +267,28 @@ class _SignInViewState extends State<SignInView> {
       await docRef.update({"emailVerified": true});
 
       if (status == "Approved" && storeName != null) {
-        // 🌟 نجاح: التوجيه إلى StoreAdminView عبر دالة الفرز
+        //  نجاح: التوجيه إلى StoreAdminView عبر دالة الفرز
         _navigateToHomeScreen(user); 
       } else {
-        // ⚠️ فشل: الحساب معلق/غير معتمد
-        if (mounted) { // 🚨 تحصين
+        //  فشل: الحساب معلق/غير معتمد
+        if (mounted) { //  تحصين
           setState(() {
             _message = "Your account is pending admin approval.";
           });
         }
-        // 🚨 تصحيح حاسم: تسجيل الخروج لمنع الدخول كعميل عادي
+        //  تصحيح حاسم: تسجيل الخروج لمنع الدخول كعميل عادي
         await FirebaseAuth.instance.signOut(); 
         _emailController.clear();
         _passwordController.clear();
       }
     } on FirebaseAuthException catch (e) {
-      if (mounted) { // 🚨 تحصين
+      if (mounted) { //  تحصين
         setState(() {
           _message = "Error signing in: ${e.message}";
         });
       }
     } on FirebaseException catch (e) {
-      if (mounted) { // 🚨 تحصين
+      if (mounted) { //  تحصين
         setState(() {
           _message = "Error checking request: ${e.message}";
         });
@@ -312,7 +313,7 @@ class _SignInViewState extends State<SignInView> {
       
       await user.sendEmailVerification();
 
-      if (mounted) { // 🚨 تحصين
+      if (mounted) { //  تحصين
         setState(() {
           _message = "Verification email sent. Please verify your email to complete your request.";
         });
@@ -328,13 +329,13 @@ class _SignInViewState extends State<SignInView> {
         }
       });
     } on FirebaseAuthException catch (e) {
-      if (mounted) { // 🚨 تحصين
+      if (mounted) { //  تحصين
         setState(() {
           _message = "Failed to create account: ${e.message}";
         });
       }
     } on FirebaseException catch (e) {
-      if (mounted) { // 🚨 تحصين
+      if (mounted) { //  تحصين
         setState(() {
           _message = "Failed to send request: ${e.message}";
         });
@@ -343,8 +344,7 @@ class _SignInViewState extends State<SignInView> {
   }
 
 
-  // MARK: - Action Buttons (No Change)
-  // ... (كود الأزرار)
+  // MARK: - Action Buttons 
 
   Widget _toggleOwnershipButton() {
     return TextButton(
@@ -373,10 +373,10 @@ class _SignInViewState extends State<SignInView> {
           _resetFormFields();
         });
       },
-      child: const Text(
-        // ... (كود النص)
-        "Don't have an account? Sign Up",
-        style: TextStyle(
+      child: Text(
+        // 💡 التصحيح: تغيير النص بناءً على حالة العرض
+        _showSignUp ? "Already have an account? Sign In" : "Don't have an account? Sign Up",
+        style: const TextStyle(
           fontSize: 14,
           color: secondaryText, 
         ),
@@ -409,12 +409,13 @@ class _SignInViewState extends State<SignInView> {
         Navigator.of(context).push(
           MaterialPageRoute(
             fullscreenDialog: true,
-            builder: (context) => const AdminLoginView(),
+            builder: (context) => const Admin.AdminLoginView(),
           ),
         );
       },
       style: ElevatedButton.styleFrom(
-        backgroundColor: primaryText, 
+        // 💡 التصحيح: لون الخلفية أسود ولون الخط أبيض
+        backgroundColor: Colors.black, 
         foregroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 20),
@@ -443,8 +444,7 @@ class _SignInViewState extends State<SignInView> {
     );
   }
 
-  // MARK: - Forms (No Change)
-  // ... (كود الفورمز)
+  // MARK: - Forms 
   Widget get _loginCustomerForm {
     return Column(
       children: [
@@ -515,7 +515,7 @@ class _SignInViewState extends State<SignInView> {
   }
   
 
-  // MARK: - Sections (No Change)
+  // MARK: - Sections 
   Widget get _customerSection {
     return Column(
       children: <Widget>[
@@ -529,6 +529,18 @@ class _SignInViewState extends State<SignInView> {
   Widget get _storeOwnerSection {
     return Column(
       children: <Widget>[
+        // 💡 العنوان الجديد
+        const Text(
+          "Store Owner Sign In",
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+            color: primaryText,
+          ),
+        ),
+        const SizedBox(height: 20),
+
         if (_isNewStoreOwner)
           Column(
             children: [
@@ -551,55 +563,74 @@ class _SignInViewState extends State<SignInView> {
   }
 
 
-  // MARK: - Main Build Method
+  // MARK: - Main Build Method (التصميم الجديد)
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white, 
-      //  لا يتم عرض CategoryHomeView هنا بعد الآن
-      body: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxWidth: 450,
-                ),
-                child: SafeArea(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 25.0, vertical: 30.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: <Widget>[
-                        const SizedBox(height: 25),
-                        const Text(
-                          "Welcome to YShop",
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontFamily: 'TenorSans',
-                            fontSize: 40,
-                            fontWeight: FontWeight.bold,
-                            color: primaryText,
-                          ),
-                        ),
-                        const SizedBox(height: 30),
-                        if (_isStoreOwner) _storeOwnerSection else _customerSection,
-                        Padding(
-                          padding: const EdgeInsets.only(top: 10.0),
-                          child: Text(
-                            _message,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: Colors.red,
-                              fontSize: 12,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFFEAEFF2), // لون رمادي فاتح جداً
+              Colors.white,
+            ],
+          ),
+        ),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: 450,
+            ),
+            child: SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(25.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    // 💡 استخدام ويدجت الشيمر الأنيق هنا
+                    const WelcomingPageShimmer(),
+                    const SizedBox(height: 30),
+                    
+                    // 💡 وضع المحتوى داخل بطاقة أنيقة ذات حواف دائرية وظل خفيف
+                    Card(
+                      elevation: 10, 
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      color: Colors.white,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 25.0, vertical: 35.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: <Widget>[
+                            if (_isStoreOwner) _storeOwnerSection else _customerSection,
+                            Padding(
+                              padding: const EdgeInsets.only(top: 20.0),
+                              child: Text(
+                                _message,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Colors.red,
+                                  fontSize: 12,
+                                ),
+                              ),
                             ),
-                          ),
+                          ],
                         ),
-                        const SizedBox(height: 50),
-                      ],
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 50),
+                  ],
                 ),
               ),
             ),
+          ),
+        ),
+      ),
     );
   }
 }

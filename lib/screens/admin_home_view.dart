@@ -4,15 +4,17 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'admin_login_view.dart'; // لاستخدام الدخول الثابت والتصاميم الداكنة
+import 'admin_login_view.dart'; // للاعتماد على AdminLoginView في دالة _logout
+import 'store_products_view.dart'; // للاعتماد على StoreProductsView في _showRequestDetails
 
-//  تعريف الألوان الداكنة
+//  تعريف الألوان الداكنة (التعديل: يجب أن تكون التعريفات الفريدة هنا فقط)
 const Color kDarkBackground = Color(0xFF1C1C1E); // خلفية الشاشة
 const Color kCardBackground = Color(0xFF2C2C2E); // خلفية البطاقات والأقسام
 const Color kAppBarBackground = Color(0xFF1C1C1E); // خلفية شريط التطبيق
 const Color kPrimaryTextColor = Colors.white; // النص الأساسي
 const Color kSecondaryTextColor = Colors.white70; // النص الثانوي/الرمادي
 const Color kSeparatorColor = Color(0xFF48484A); // لون الفاصل/الحدود
+const Color kAccentBlue = Color(0xFF007AFF); // اللون الأزرق المميز
 
 //  النماذج (يجب أن تكون في ملف منفصل في بيئة الإنتاج)
 class ProductSS {
@@ -140,14 +142,11 @@ class _AdminHomeViewState extends State<AdminHomeView> {
         backgroundColor: kAppBarBackground,
         foregroundColor: kPrimaryTextColor,
         elevation: 0,
+        automaticallyImplyLeading: false, // أضف هذا السطر
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh, color: Colors.white),
             onPressed: _refreshData,
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: _logout,
           ),
         ],
       ),
@@ -359,6 +358,17 @@ class _AdminHomeViewState extends State<AdminHomeView> {
         request: request,
         onUpdateStatus: _updateRequestStatus,
         onDismiss: _refreshData,
+        // 💡 تمرير دالة للانتقال إلى شاشة المنتجات
+        onViewProducts: () {
+          // إغلاق الشيت أولاً ثم الانتقال
+          Navigator.pop(context); 
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              // نستخدم الإيميل كمعرف للمتجر (Store Owner Email)
+              builder: (context) => StoreProductsView(storeOwnerEmail: request.email, storeName: request.storeName),
+            ),
+          ).then((_) => _refreshData()); // تحديث البيانات عند العودة
+        },
       ),
     );
   }
@@ -402,15 +412,20 @@ class _AdminHomeViewState extends State<AdminHomeView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        ElevatedButton.icon(
-          onPressed: _logout,
-          icon: const Icon(Icons.logout, color: Colors.red),
-          label: const Text("Logout", style: TextStyle(color: Colors.red, fontSize: 18)),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.red.withOpacity(0.1),
-            padding: const EdgeInsets.symmetric(vertical: 15),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            elevation: 0,
+        Center(
+          child: SizedBox(
+            width: 450,
+            child: ElevatedButton.icon(
+              onPressed: _logout,
+              icon: const Icon(Icons.logout, color: Colors.red),
+              label: const Text("Logout", style: TextStyle(color: Colors.red, fontSize: 18)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.withOpacity(0.1),
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: 0,
+              ),
+            ),
           ),
         ),
       ],
@@ -869,12 +884,14 @@ class _StoreRequestDetailView extends StatelessWidget {
   final StoreRequest request;
   final Function(StoreRequest, String) onUpdateStatus;
   final VoidCallback onDismiss;
+  final VoidCallback onViewProducts; 
 
   const _StoreRequestDetailView({
     super.key,
     required this.request,
     required this.onUpdateStatus,
     required this.onDismiss,
+    required this.onViewProducts, 
   });
 
   @override
@@ -949,11 +966,22 @@ class _StoreRequestDetailView extends StatelessWidget {
               _DetailSection(
                 title: "Actions",
                 children: [
+                  // 💡 زر عرض المنتجات (يظل ElevatedButton)
+SizedBox(
+                    width: double.infinity,
+                    child: _ActionButton(
+                      label: "View Products (${request.storeName})",
+                      color: kAccentBlue,
+                      onPressed: onViewProducts,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
+                      // 💡 استخدام _ActionTextButton (Accept)
                       Expanded(
-                        child: _ActionButton(
+                        child: _ActionTextButton(
                           label: "Accept",
                           color: Colors.green,
                           onPressed: () {
@@ -963,8 +991,9 @@ class _StoreRequestDetailView extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 16),
+                      // 💡 استخدام _ActionTextButton (Reject)
                       Expanded(
-                        child: _ActionButton(
+                        child: _ActionTextButton(
                           label: "Reject",
                           color: Colors.red,
                           onPressed: () {
@@ -974,8 +1003,9 @@ class _StoreRequestDetailView extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 16),
+                      // 💡 استخدام _ActionTextButton (Pending)
                       Expanded(
-                        child: _ActionButton(
+                        child: _ActionTextButton(
                           label: "Pending",
                           color: Colors.orange,
                           onPressed: () {
@@ -1097,6 +1127,38 @@ class _ActionButton extends StatelessWidget {
         elevation: 0,
       ),
       child: Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+    );
+  }
+}
+
+
+class _ActionTextButton extends StatelessWidget {
+  final String label;
+  final Color color;
+  final VoidCallback onPressed;
+
+  const _ActionTextButton({super.key, required this.label, required this.color, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton(
+      onPressed: onPressed,
+      style: TextButton.styleFrom(
+        // لون شفاف للخلفية
+        backgroundColor: color.withOpacity(0.1),
+        // لون النص هو اللون الأساسي
+        foregroundColor: color, 
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          // إضافة حد رفيع بنفس لون النص لتمييزه
+          side: BorderSide(color: color.withOpacity(0.5), width: 1), 
+        ),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+      ),
     );
   }
 }

@@ -89,7 +89,7 @@ class _ChatViewState extends State<ChatView> {
         ? widget.currentUserID 
         : widget.product.storeOwnerEmail;
 
-    // 🚨 التحقق النهائي: إذا كان أي من المعرّفين فارغاً، لن نرسل الرسالة (هذا لمنع خطأ الصلاحيات الدائم)
+    //  التحقق النهائي: إذا كان أي من المعرّفين فارغاً، لن نرسل الرسالة (هذا لمنع خطأ الصلاحيات الدائم)
     if (finalCustomerID.isEmpty || finalStoreOwnerID.isEmpty) {
         print("Error: CustomerID (${finalCustomerID}) or StoreOwnerID (${finalStoreOwnerID}) is missing.");
         ScaffoldMessenger.of(context).showSnackBar(

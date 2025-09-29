@@ -10,7 +10,7 @@ import '../widgets/settings_widgets.dart';
 import '../widgets/map_picker_sheet.dart'; 
 import '../state_management/theme_manager.dart'; 
 
-// 🚨 التصحيح الأول: تعديل الدالة المساعدة لتقبل BuildContext
+//  التصحيح الأول: تعديل الدالة المساعدة لتقبل BuildContext
 TextStyle _getTenorSansStyle(double size, {FontWeight weight = FontWeight.normal, Color? color, required BuildContext context}) {
   // استخدام لون النص الأساسي للـ Theme الحالي كلون افتراضي
   final defaultColor = Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black; 
@@ -236,7 +236,7 @@ class _SettingsViewState extends State<SettingsView> {
                     const SizedBox(width: 16),
                     Text(
                       themeManager.isDarkMode ? "Dark Mode" : "Light Mode",
-                      // 🚨 تحديث: تمرير context للدالة
+                      //  تحديث: تمرير context للدالة
                       style: _getTenorSansStyle(15, weight: FontWeight.w500, context: context).copyWith(color: textColor),
                     ),
                   ],
@@ -254,7 +254,7 @@ class _SettingsViewState extends State<SettingsView> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        // 🚨 التصحيح الثاني: تمرير context للدالة
+        //  التصحيح الثاني: تمرير context للدالة
         title: Text("Settings", style: _getTenorSansStyle(18, weight: FontWeight.w600, context: context)),
         centerTitle: true,
         // باقي الخصائص تأتي من AppBarTheme في main.dart
@@ -383,7 +383,7 @@ class _SettingsViewState extends State<SettingsView> {
         children: [
           Text(
             title,
-            // 🚨 التصحيح الثالث: تمرير context للدالة
+            //  التصحيح الثالث: تمرير context للدالة
             style: _getTenorSansStyle(17, weight: FontWeight.w600, context: context),
           ),
           Divider(height: 24, color: Theme.of(context).dividerColor), 
@@ -408,7 +408,7 @@ class _SettingsViewState extends State<SettingsView> {
           foregroundColor: Theme.of(context).colorScheme.background, 
           minimumSize: const Size(double.infinity, 50),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          // 🚨 التصحيح الرابع: تمرير context للدالة
+          //  التصحيح الرابع: تمرير context للدالة
           textStyle: _getTenorSansStyle(15, context: context), 
         ),
       ),
@@ -441,7 +441,7 @@ class _SettingsViewState extends State<SettingsView> {
                   const SizedBox(width: 8),
                   Text(
                     "Save Address",
-                    // 🚨 التصحيح الخامس: تمرير context للدالة
+                    //  التصحيح الخامس: تمرير context للدالة
                     style: _getTenorSansStyle(16, weight: FontWeight.w600, context: context).copyWith(color: Colors.white),
                   ),
                 ],

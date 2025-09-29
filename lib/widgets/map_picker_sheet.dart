@@ -128,7 +128,7 @@ class _MapPickerSheetState extends State<MapPickerSheet> {
     if (placemarks.isNotEmpty) {
       Placemark place = placemarks.first;
       
-      // 🚨 تحسين طريقة بناء العنوان لمعالجة القيم الفارغة بشكل آمن
+      //  تحسين طريقة بناء العنوان لمعالجة القيم الفارغة بشكل آمن
       String address = [
         place.street,
         place.subLocality,
@@ -181,7 +181,7 @@ class _MapPickerSheetState extends State<MapPickerSheet> {
         initialZoom: 15,
         onMapEvent: _onMapEvent, 
         interactionOptions: InteractionOptions(
-          // 🚨 تم إصلاح هذا الخطأ
+          //  تم إصلاح هذا الخطأ
           flags: InteractiveFlag.all & ~InteractiveFlag.rotate, 
         ),
       ),

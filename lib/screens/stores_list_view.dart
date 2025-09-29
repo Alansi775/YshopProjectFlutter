@@ -150,7 +150,7 @@ class _StoresListViewState extends State<StoresListView> {
       drawer: Drawer(child: SideMenuViewContents()),
       endDrawer: Drawer(child: SideCartViewContents()),
       
-      // 🚨 التعديل 1: إضافة AppBar هنا
+      //  التعديل 1: إضافة AppBar هنا
       appBar: AppBar(
         // زر الرجوع (Leading) لليسار
         leading: IconButton(
@@ -185,7 +185,7 @@ class _StoresListViewState extends State<StoresListView> {
         centerTitle: true,
       ),
       
-      // 🚨 التعديل 2: إزالة SafeArea حول الـ body واستبدالها بالـ SingleChildScrollView مباشرة
+      //  التعديل 2: إزالة SafeArea حول الـ body واستبدالها بالـ SingleChildScrollView مباشرة
       body: Stack(
         children: [
           SingleChildScrollView(
@@ -193,7 +193,7 @@ class _StoresListViewState extends State<StoresListView> {
             // لإزالة الـ Row المخصص (Header) الذي كان موجوداً
             child: Column(
               children: [
-                // 🚨 التعديل 3: تم حذف الـ Row المخصص للـ Header هنا
+                //  التعديل 3: تم حذف الـ Row المخصص للـ Header هنا
                 // --------------------------------------------------------------------------------
 
                 // Content Header & Grid

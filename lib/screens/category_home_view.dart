@@ -5,7 +5,7 @@ import 'dart:async';
 import '../widgets/category_widgets.dart'; // افترض وجود هذا الملف لـ CategoriesGridView و BrandShowcaseView
 import '../widgets/custom_form_widgets.dart'; // للوصول إلى primaryText (افترض وجوده)
 import '../widgets/side_menu_view_contents.dart'; 
-// 🚨 الإضافة المطلوبة: استيراد ملف سلة المشتريات الجانبية الجاهز
+//  الإضافة المطلوبة: استيراد ملف سلة المشتريات الجانبية الجاهز
 import '../widgets/side_cart_view_contents.dart'; 
 
 
@@ -152,9 +152,9 @@ class _CategoryHomeViewState extends State<CategoryHomeView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // 🚨 التعديل: استدعاء الـ Widget الفعلي
+      //  التعديل: استدعاء الـ Widget الفعلي
       drawer: const Drawer(child: SideMenuViewContents()),
-      // 🚨 الآن سيتم استخدام ملفك الجاهز SideCartViewContents.dart
+      //  الآن سيتم استخدام ملفك الجاهز SideCartViewContents.dart
       endDrawer: Drawer(child: SideCartViewContents()), 
       
       body: CustomScrollView(
