@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "536109698393",
+    "project_id": "home-720ef",
+    "storage_bucket": "home-720ef.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:536109698393:android:90dfa5536d3c61f70a1048",
+        "android_client_info": {
+          "package_name": "com.example.yshop"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDh3YAaUFyTwZLqhlcrCH5f5BtT4hDpWMs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:536109698393:android:e0e32730e3c6dd430a1048",
+        "android_client_info": {
+          "package_name": "com.firebase.home"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDh3YAaUFyTwZLqhlcrCH5f5BtT4hDpWMs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
