@@ -1,24 +1,24 @@
+// lib/widgets/order_tracker_widget.dart (مصحح للثيم الديناميكي)
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart'; 
 import '../state_management/cart_manager.dart'; 
-// import '../models/product.dart'; 
-// import '../models/cart_item_model.dart'; 
-
-
-// دالة مساعدة لخط "TenorSans" (موجودة في ملف CheckoutScreen)
-TextStyle _getTenorSansStyle(double size, {FontWeight weight = FontWeight.normal, Color? color}) {
-  return TextStyle(
-    fontFamily: 'TenorSans', 
-    fontSize: size,
-    fontWeight: weight,
-    color: color ?? Colors.black,
-  );
-}
 
 class OrderTrackerWidget extends StatelessWidget {
   const OrderTrackerWidget({Key? key}) : super(key: key);
+  
+  // 💡 تم تعديل الدالة لتقبل context وتستخدم primaryColor افتراضيًا
+  TextStyle _getTenorSansStyle(BuildContext context, double size, {FontWeight weight = FontWeight.normal, Color? color}) {
+    final Color primaryColor = Theme.of(context).colorScheme.primary; 
+    return TextStyle(
+      fontFamily: 'TenorSans', 
+      fontSize: size,
+      fontWeight: weight,
+      color: color ?? primaryColor,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,32 +47,25 @@ class OrderTrackerWidget extends StatelessWidget {
   // بناء مؤشر الحالة المتحرك
   Widget _buildTrackerIndicator(BuildContext context, String orderId, String status) {
     
-    Color statusColor;
-    IconData statusIcon;
+    Color statusColor = _getStatusColor(status); // 💡 استخدام دالة موحدة
 
-    switch (status) {
-      case 'Pending':
-        // ⭐️ تم تغيير اللون الأساسي لـ Pending إلى الأزرق الفاتح
-        statusColor = Colors.lightBlue.shade600; 
-        statusIcon = Icons.hourglass_top;
-        break;
-      case 'Processing':
-        statusColor = Colors.blue.shade600;
-        statusIcon = Icons.kitchen_rounded;
-        break;
-      case 'Out for Delivery':
-        statusColor = Colors.green.shade600;
-        statusIcon = Icons.delivery_dining;
-        break;
-      case 'Delivered':
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          Provider.of<CartManager>(context, listen: false).setLastOrderId(null);
+    // 💡 إخفاء الودجت إذا تم التوصيل ومسح الـ orderId
+    if (status == 'Delivered') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // ننتظر قليلاً (اختياري) قبل المسح لإعطاء المستخدم وقتاً لرؤية الحالة
+        Future.delayed(const Duration(seconds: 1), () {
+            Provider.of<CartManager>(context, listen: false).setLastOrderId(null);
         });
-        return const SizedBox.shrink();
-
-      default:
-        statusColor = Colors.red.shade600;
-        statusIcon = Icons.error_outline;
+      });
+      return const SizedBox.shrink();
+    }
+    
+    IconData statusIcon;
+    switch (status) {
+      case 'Pending': statusIcon = Icons.hourglass_top; break;
+      case 'Processing': statusIcon = Icons.kitchen_rounded; break;
+      case 'Out for Delivery': statusIcon = Icons.delivery_dining; break;
+      default: statusIcon = Icons.error_outline;
     }
 
     return Positioned(
@@ -97,6 +90,7 @@ class OrderTrackerWidget extends StatelessWidget {
             ],
           ),
           child: Center(
+            // 💡 لون الأيقونة يبقى أبيض ليتناقض مع ألوان الحالة
             child: Icon(statusIcon, color: Colors.white, size: 28), 
           ),
         ),
@@ -106,6 +100,9 @@ class OrderTrackerWidget extends StatelessWidget {
 
   // عرض الورقة السفلية لتفاصيل الطلب
   void _showOrderDetailsSheet(BuildContext context, String orderId, String currentStatus) {
+    // 💡 جلب الألوان الديناميكية
+    final Color cardColor = Theme.of(context).cardColor;
+    
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -114,7 +111,7 @@ class OrderTrackerWidget extends StatelessWidget {
         return Container(
           height: MediaQuery.of(context).size.height * 0.8, 
           decoration: BoxDecoration(
-            color: Theme.of(context).cardColor,
+            color: cardColor, // 💡 استخدام cardColor
             borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(30.0), 
               topRight: Radius.circular(30.0), 
@@ -124,10 +121,11 @@ class OrderTrackerWidget extends StatelessWidget {
             stream: FirebaseFirestore.instance.collection('orders').doc(orderId).snapshots(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator(color: Colors.deepOrange));
+                // 💡 استخدام لون يتناسب مع الثيم (secondary)
+                return Center(child: CircularProgressIndicator(color: Theme.of(context).colorScheme.secondary)); 
               }
               if (!snapshot.hasData || !snapshot.data!.exists) {
-                return Center(child: Text("Order: $orderId Not Found", style: _getTenorSansStyle(18)));
+                return Center(child: Text("Order: $orderId Not Found", style: _getTenorSansStyle(context, 18))); // 💡 تمرير context
               }
 
               final orderData = snapshot.data!.data() as Map<String, dynamic>;
@@ -147,7 +145,8 @@ class OrderTrackerWidget extends StatelessWidget {
                   final storeType = storeTypeSnapshot.data ?? 'Food'; 
                   
                   if (storeTypeSnapshot.connectionState == ConnectionState.waiting) {
-                     return const Center(child: CircularProgressIndicator(color: Colors.deepOrange));
+                     // 💡 استخدام لون يتناسب مع الثيم (secondary)
+                     return Center(child: CircularProgressIndicator(color: Theme.of(context).colorScheme.secondary));
                   }
               
                   return _buildOrderDetailsContent(context, dataWithId, storeType); 
@@ -160,43 +159,47 @@ class OrderTrackerWidget extends StatelessWidget {
     );
   }
 
+  // دالة جلب نوع المتجر (تبقى كما هي)
   Future<String?> _fetchStoreType(String storeEmail) async {
-  try {
-    final querySnapshot = await FirebaseFirestore.instance
-        .collection('storeRequests')
-        .where('email', isEqualTo: storeEmail)
-        .limit(1)
-        .get();
-        
-    if (querySnapshot.docs.isNotEmpty) {
-      return querySnapshot.docs.first.data()['storeType'] as String?;
+    try {
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('storeRequests')
+          .where('email', isEqualTo: storeEmail)
+          .limit(1)
+          .get();
+          
+      if (querySnapshot.docs.isNotEmpty) {
+        return querySnapshot.docs.first.data()['storeType'] as String?;
+      }
+      return null;
+    } catch (e) {
+      return null;
     }
-    return null;
-  } catch (e) {
-    //print("Error fetching store type: $e");
-    return null;
   }
-}
 
-// 2. تعيين أيقونة التحضير بناءً على نوع المتجر
-IconData _getPreparationIcon(String storeType) {
-  switch (storeType.toLowerCase()) {
-    case 'market':
-      return Icons.shopping_basket_outlined; 
-    case 'clothes':
-      return Icons.checkroom_outlined; 
-    case 'pharmacy':
-      return Icons.medical_services_outlined; 
-    case 'food':
-    case 'restaurants':
-      return Icons.restaurant_menu_outlined; 
-    default:
-      return Icons.build; 
+  // دالة تعيين أيقونة التحضير (تبقى كما هي)
+  IconData _getPreparationIcon(String storeType) {
+    switch (storeType.toLowerCase()) {
+      case 'market':
+        return Icons.shopping_basket_outlined; 
+      case 'clothes':
+        return Icons.checkroom_outlined; 
+      case 'pharmacy':
+        return Icons.medical_services_outlined; 
+      case 'food':
+      case 'restaurants':
+        return Icons.restaurant_menu_outlined; 
+      default:
+        return Icons.build; 
+    }
   }
-}
 
   // ⭐️ ودجت المنتج لعرض قائمة الطلبات بشكل أنيق
   Widget _buildProductItem(BuildContext context, Map<String, dynamic> item) {
+    // 💡 جلب الألوان الديناميكية
+    final Color secondaryColor = Theme.of(context).colorScheme.onSurface;
+    final Color cardColor = Theme.of(context).cardColor;
+    
     final price = (item['price'] as num?)?.toDouble() ?? 0.0;
     final quantity = item['quantity'] as int? ?? 1;
 
@@ -210,7 +213,7 @@ IconData _getPreparationIcon(String storeType) {
             width: 60,
             height: 60,
             decoration: BoxDecoration(
-              color: Colors.grey.shade200,
+              color: secondaryColor.withOpacity(0.1), // 💡 لون ديناميكي خفيف
               borderRadius: BorderRadius.circular(10),
               image: item['imageUrl'] != null
                   ? DecorationImage(
@@ -219,7 +222,8 @@ IconData _getPreparationIcon(String storeType) {
                     )
                   : null,
             ),
-            child: item['imageUrl'] == null ? const Icon(Icons.image_not_supported, color: Colors.grey) : null,
+            // 💡 استخدام secondaryColor للأيقونة
+            child: item['imageUrl'] == null ? Icon(Icons.image_not_supported, color: secondaryColor.withOpacity(0.5)) : null,
           ),
           const SizedBox(width: 15),
           
@@ -230,7 +234,7 @@ IconData _getPreparationIcon(String storeType) {
                 // ⭐️ اسم المنتج
                 Text(
                   item['name'] as String? ?? 'Unknown Product',
-                  style: _getTenorSansStyle(16, weight: FontWeight.w600),
+                  style: _getTenorSansStyle(context, 16, weight: FontWeight.w600), // 💡 تمرير context
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -238,7 +242,8 @@ IconData _getPreparationIcon(String storeType) {
                 // ⭐️ السعر والكمية
                 Text(
                   'Qty: $quantity x \$${price.toStringAsFixed(2)}',
-                  style: _getTenorSansStyle(14, color: Colors.grey.shade600),
+                  // 💡 استخدام secondaryColor
+                  style: _getTenorSansStyle(context, 14).copyWith(color: secondaryColor.withOpacity(0.7)),
                 ),
               ],
             ),
@@ -247,14 +252,14 @@ IconData _getPreparationIcon(String storeType) {
           // ⭐️ الإجمالي الفرعي (لون برتقالي غير مُخيف)
           Text(
             '\$${(price * quantity).toStringAsFixed(2)}',
-            style: _getTenorSansStyle(16, weight: FontWeight.bold, color: Colors.deepOrange),
+            style: _getTenorSansStyle(context, 16, weight: FontWeight.bold, color: Colors.deepOrange),
           ),
         ],
       ),
     );
   }
 
-  // ⭐️ ودجت أيقونة التوصيل المخصصة
+  // ⭐️ ودجت أيقونة التوصيل المخصصة (تبقى كما هي)
   IconData _getDeliveryIcon(String deliveryOption) {
     if (deliveryOption.toLowerCase().contains('drone')) {
       return Icons.flight; 
@@ -268,7 +273,7 @@ IconData _getPreparationIcon(String storeType) {
   // 💡 المحتوى الرئيسي للورقة السفلية (تم تحسينه)
   Widget _buildOrderDetailsContent(BuildContext context, Map<String, dynamic> orderData, String storeType) {
     final status = orderData['status'] as String? ?? 'Pending';
-    final total = orderData['total'] ?? 0;
+    final total = (orderData['total'] as num?)?.toDouble() ?? 0.0;
     final createdAtTimestamp = orderData['createdAt'] as Timestamp?;
     final date = createdAtTimestamp != null ? createdAtTimestamp.toDate() : DateTime.now();
     final documentId = orderData['documentId'] as String? ?? 'N/A'; 
@@ -276,18 +281,18 @@ IconData _getPreparationIcon(String storeType) {
     final items = orderData['items'] as List<dynamic>? ?? [];
     final storeName = (items.isNotEmpty) ? items.first['storeName'] : 'Unknown Store';
     
-    // ⭐️ استخلاص طريقة الدفع
-    final paymentMethod = orderData['paymentMethod'] as String? ?? 'Not Specified'; 
+    // 💡 جلب الألوان الديناميكية
+    final Color primaryColor = Theme.of(context).colorScheme.primary; 
+    final Color secondaryColor = Theme.of(context).colorScheme.onSurface;
     
+    final paymentMethod = orderData['paymentMethod'] as String? ?? 'Not Specified'; 
     final preparationIcon = _getPreparationIcon(storeType); 
     
-    // ⭐️ تنسيق الوقت والتاريخ
-    final timeFormat = DateFormat('h:mm a'); // 1:48 AM/PM
-    final dateFormat = DateFormat('MMM d'); // Oct 1
+    final timeFormat = DateFormat('h:mm a'); 
+    final dateFormat = DateFormat('MMM d'); 
     final formattedTime = '${timeFormat.format(date)} - ${dateFormat.format(date)}';
 
     final trackingSteps = [
-      // 💡 تم تغيير الأيقونة
       {'title': 'Order Placed', 'status': 'Pending', 'icon': Icons.verified_user_outlined},
       {'title': 'Preparation', 'status': 'Processing', 'icon': preparationIcon}, 
       {'title': 'On Delivery', 'status': 'Out for Delivery', 'icon': _getDeliveryIcon(deliveryOption)}, 
@@ -299,17 +304,19 @@ IconData _getPreparationIcon(String storeType) {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. العنوان ورقم الطلب (شريط أنيق ومرتب)
+          // 1. العنوان ورقم الطلب
           Center(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), 
               decoration: BoxDecoration(
-                color: Colors.grey.shade100,
+                // 💡 استخدام لون ثانوي خفيف
+                color: secondaryColor.withOpacity(0.1), 
                 borderRadius: BorderRadius.circular(25),
               ),
               child: Text(
                 "Order: $documentId",
-                style: _getTenorSansStyle(14, weight: FontWeight.w600, color: Colors.grey.shade800), 
+                // 💡 استخدام primaryColor
+                style: _getTenorSansStyle(context, 14, weight: FontWeight.w600, color: primaryColor), 
                 textAlign: TextAlign.center, 
                 softWrap: true, 
               ),
@@ -318,39 +325,42 @@ IconData _getPreparationIcon(String storeType) {
           const SizedBox(height: 25), 
           
           // 2. شريط التتبع الأفقي
-          _buildTrackingTimeline(trackingSteps, status),
+          _buildTrackingTimeline(context, trackingSteps, status), // 💡 تمرير context
           
-          const Divider(height: 30, thickness: 1.5, color: Colors.grey),
+          // 💡 استخدام Divider يتكيف مع الثيم
+          Divider(height: 30, thickness: 1.5, color: Theme.of(context).dividerColor),
 
           // 3. تفاصيل الطلب السريعة واسم المتجر
           Text(
             "$storeName Order Summary", 
-            style: _getTenorSansStyle(18, weight: FontWeight.bold),
+            style: _getTenorSansStyle(context, 18, weight: FontWeight.bold), // 💡 تمرير context
           ),
           const SizedBox(height: 15),
           
           _buildDetailRow(context, "Order Time:", formattedTime, icon: Icons.access_time),
-          _buildDetailRow(context, "Payment Method:", paymentMethod, icon: Icons.credit_card_outlined), // ⭐️ تم إضافة طريقة الدفع
+          _buildDetailRow(context, "Payment Method:", paymentMethod, icon: Icons.credit_card_outlined), 
           _buildDetailRow(context, "Total Amount:", "\$${total.toStringAsFixed(2)}", color: Colors.deepOrange),
           
-          const Divider(height: 30, thickness: 0.8),
+          // 💡 استخدام Divider يتكيف مع الثيم
+          Divider(height: 30, thickness: 0.8, color: Theme.of(context).dividerColor),
           
-          // 4. قائمة المنتجات (أكثر تفصيلاً)
+          // 4. قائمة المنتجات
           Text(
             "Items Ordered (${items.length})", 
-            style: _getTenorSansStyle(18, weight: FontWeight.bold),
+            style: _getTenorSansStyle(context, 18, weight: FontWeight.bold),
           ),
           const SizedBox(height: 15),
           
           ...items.map((item) => _buildProductItem(context, item as Map<String, dynamic>)).toList(),
           
-          const Divider(height: 30, thickness: 0.8),
+          // 💡 استخدام Divider يتكيف مع الثيم
+          Divider(height: 30, thickness: 0.8, color: Theme.of(context).dividerColor),
           
-          // 5. معلومات التوصيل (عنوان في المنتصف)
+          // 5. معلومات التوصيل
           Center(
             child: Text(
               "Delivery Info", 
-              style: _getTenorSansStyle(18, weight: FontWeight.bold),
+              style: _getTenorSansStyle(context, 18, weight: FontWeight.bold),
             ),
           ),
           const SizedBox(height: 15),
@@ -367,23 +377,28 @@ IconData _getPreparationIcon(String storeType) {
 
   // ودجت مساعد لبناء صفوف التفاصيل (مع دعم الأيقونات)
   Widget _buildDetailRow(BuildContext context, String label, dynamic value, {Color? color, IconData? icon, bool isAddress = false}) {
+    // 💡 جلب الألوان الديناميكية
+    final Color secondaryColor = Theme.of(context).colorScheme.onSurface;
+    
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
         crossAxisAlignment: isAddress ? CrossAxisAlignment.start : CrossAxisAlignment.center, 
         children: [
-          // ⭐️ أيقونة (إذا كانت موجودة)
+          // ⭐️ أيقونة
           if (icon != null) ...[
-            Icon(icon, size: 20, color: Colors.grey.shade700),
+            // 💡 استخدام secondaryColor
+            Icon(icon, size: 20, color: secondaryColor.withOpacity(0.7)),
             const SizedBox(width: 10),
           ],
           
           // 1. Label
           SizedBox(
-            width: 130, // عرض ثابت لـ Label (لتنظيم أفضل)
+            width: 130, 
             child: Text(
               label, 
-              style: _getTenorSansStyle(15).copyWith(color: Colors.grey.shade600),
+              // 💡 استخدام secondaryColor
+              style: _getTenorSansStyle(context, 15).copyWith(color: secondaryColor.withOpacity(0.7)),
             ),
           ),
           
@@ -391,9 +406,10 @@ IconData _getPreparationIcon(String storeType) {
           Expanded( 
             child: Text(
               value.toString(),
-              style: _getTenorSansStyle(15, weight: FontWeight.w600).copyWith(color: color),
-              textAlign: TextAlign.right, // محاذاة النص لليمين لجعله يبدو مرتباً
-              maxLines: isAddress ? 4 : 2, // عدد أسطر أكبر للعنوان
+              // 💡 استخدام primaryColor إذا لم يتم تحديد لون
+              style: _getTenorSansStyle(context, 15, weight: FontWeight.w600).copyWith(color: color),
+              textAlign: TextAlign.right, 
+              maxLines: isAddress ? 4 : 2, 
               overflow: TextOverflow.ellipsis, 
             ),
           ),
@@ -403,7 +419,10 @@ IconData _getPreparationIcon(String storeType) {
   }
   
   // ودجت بناء شريط التتبع (أيقونات واضحة)
-  Widget _buildTrackingTimeline(List<Map<String, dynamic>> steps, String currentStatus) {
+  Widget _buildTrackingTimeline(BuildContext context, List<Map<String, dynamic>> steps, String currentStatus) {
+    // 💡 جلب الألوان الديناميكية
+    final Color primaryColor = Theme.of(context).colorScheme.primary; 
+    
     return SizedBox(
       height: 90,
       child: Row(
@@ -411,16 +430,9 @@ IconData _getPreparationIcon(String storeType) {
         children: steps.map((step) {
           final isCompleted = _isStepCompleted(step['status'] as String, currentStatus);
           
-          // 💡 تغيير اللون بناءً على حالة الطلب
-          Color statusColor;
-          if (step['status'] == 'Pending') {
-             // ⭐️ لون حيادي للمرحلة الأولى
-             statusColor = Colors.lightBlue.shade600; 
-          } else {
-             statusColor = _getStatusColor(step['status']);
-          }
+          Color statusColor = _getStatusColor(step['status']);
           
-          final color = isCompleted ? statusColor : Colors.grey.shade400; 
+          final color = isCompleted ? statusColor : Theme.of(context).dividerColor; // 💡 استخدام لون الـ Divider للخطوات غير المكتملة
           final icon = step['icon'] as IconData;
           
           return Expanded( 
@@ -440,6 +452,7 @@ IconData _getPreparationIcon(String storeType) {
                 // ⭐️ عنوان الخطوة
                 Text(
                   step['title'] as String, 
+                  // 💡 استخدام لون الخطوة المكتملة أو primaryColor للخطوة غير المكتملة
                   style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600), 
                   textAlign: TextAlign.center, 
                   maxLines: 1,
@@ -453,7 +466,7 @@ IconData _getPreparationIcon(String storeType) {
     );
   }
 
-  // دالة مساعدة لتحديد ما إذا كانت الخطوة قد اكتملت
+  // دالة مساعدة لتحديد ما إذا كانت الخطوة قد اكتملت (تبقى كما هي)
   bool _isStepCompleted(String stepStatus, String currentStatus) {
     final statusOrder = ['Pending', 'Processing', 'Out for Delivery', 'Delivered'];
     final currentStatusIndex = statusOrder.indexOf(currentStatus);
@@ -461,15 +474,14 @@ IconData _getPreparationIcon(String storeType) {
     return currentStatusIndex >= stepStatusIndex;
   }
   
-  // دالة مساعدة للحصول على لون الحالة
+  // دالة مساعدة للحصول على لون الحالة (تبقى كما هي)
   Color _getStatusColor(String status) {
     switch (status) {
-      // 💡 تغيير لون Pending ليتناسب مع التتبع
       case 'Pending': return Colors.lightBlue.shade600; 
       case 'Processing': return Colors.blue.shade600;
       case 'Out for Delivery': return Colors.green.shade600;
       case 'Delivered': return Colors.green.shade700;
-      default: return Colors.grey;
+      default: return Colors.red.shade600;
     }
   }
 }

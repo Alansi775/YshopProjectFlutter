@@ -10,17 +10,22 @@ class CheckoutItemWidget extends StatelessWidget {
 
   const CheckoutItemWidget({Key? key, required this.item}) : super(key: key);
 
-  TextStyle _getTenorSansStyle(double size, {FontWeight weight = FontWeight.normal, Color? color}) {
+  // 💡 تم تعديل الدالة لتقبل context وتستخدم primaryColor افتراضيًا
+  TextStyle _getTenorSansStyle(BuildContext context, double size, {FontWeight weight = FontWeight.normal, Color? color}) {
+    final Color primaryColor = Theme.of(context).colorScheme.primary; 
     return TextStyle(
       fontFamily: 'TenorSans', 
       fontSize: size,
       fontWeight: weight,
-      color: color ?? Colors.black,
+      color: color ?? primaryColor,
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    // 💡 جلب الألوان الديناميكية
+    final Color secondaryColor = Theme.of(context).colorScheme.onSurface;
+    
     // تنسيق السعر لعرضه بشكل فردي
     final String priceFormatted = NumberFormat.currency(symbol: '\$').format(item.product.price);
 
@@ -38,10 +43,11 @@ class CheckoutItemWidget extends StatelessWidget {
               width: 60,
               height: 60,
               placeholder: (context, url) => Container(
-                width: 60, height: 60, color: Colors.grey.shade300,
+                width: 60, height: 60, color: secondaryColor.withOpacity(0.1), // 💡 لون ديناميكي
               ),
               errorWidget: (context, url, error) => Container(
-                width: 60, height: 60, color: Colors.grey.shade300, child: const Icon(Icons.error),
+                width: 60, height: 60, color: secondaryColor.withOpacity(0.1), 
+                child: Icon(Icons.error, color: secondaryColor), // 💡 لون ديناميكي
               ),
             ),
           ),
@@ -55,7 +61,7 @@ class CheckoutItemWidget extends StatelessWidget {
               children: [
                 Text(
                   item.product.name,
-                  style: _getTenorSansStyle(16),
+                  style: _getTenorSansStyle(context, 16), // 💡 تمرير context
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -63,13 +69,14 @@ class CheckoutItemWidget extends StatelessWidget {
                 // (item.count) × (item.product.price)
                 Text(
                   "${item.quantity} × $priceFormatted",
-                  style: _getTenorSansStyle(14).copyWith(color: Colors.grey.shade600),
+                  // 💡 استخدام secondaryColor
+                  style: _getTenorSansStyle(context, 14).copyWith(color: secondaryColor.withOpacity(0.7)),
                 ),
               ],
             ),
           ),
           
-          // 3. مسافة (Spacer في Swift)
+          // 3. مسافة
           const SizedBox(width: 8), 
         ],
       ),

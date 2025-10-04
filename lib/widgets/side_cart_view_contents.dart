@@ -1,4 +1,4 @@
-// lib/widgets/side_cart_view_contents.dart (الكود الكامل والنهائي)
+// lib/widgets/side_cart_view_contents.dart (الكود النهائي المصحح)
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -10,34 +10,46 @@ import 'cart_item_widget.dart';
 class SideCartViewContents extends StatelessWidget {
   const SideCartViewContents({Key? key}) : super(key: key); 
 
-  // دالة مساعدة لخط "TenorSans"
-  TextStyle _getTenorSansStyle(double size, {FontWeight weight = FontWeight.normal, Color? color}) {
+  // 💡 تم تعديل الدالة لتقبل context وتستخدم primaryColor افتراضيًا
+  TextStyle _getTenorSansStyle(BuildContext context, double size, {FontWeight weight = FontWeight.normal, Color? color}) {
+    final Color primaryColor = Theme.of(context).colorScheme.primary; 
     return TextStyle(
       fontFamily: 'TenorSans', 
       fontSize: size,
       fontWeight: weight,
-      color: color ?? Colors.black,
+      color: color ?? primaryColor, // 💡 استخدام primaryColor افتراضيًا
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    // 💡 جلب الألوان الأساسية هنا
+    final Color primaryColor = Theme.of(context).colorScheme.primary;
+    final Color scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
+
     return Consumer<CartManager>(
       builder: (context, cartManager, child) {
         final items = cartManager.items;
         final totalAmount = cartManager.totalAmount;
 
         return Scaffold(
+          // 💡 استخدام scaffoldColor
+          backgroundColor: scaffoldColor,
           appBar: AppBar(
+            // 💡 استخدام لون خلفية AppBar الديناميكي
+            backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+            // 💡 استخدام primaryColor للأيقونات والتكست
+            foregroundColor: primaryColor,
             title: Text(
               "Shopping Cart (${cartManager.totalItems})",
-              style: _getTenorSansStyle(18),
+              style: _getTenorSansStyle(context, 18), // 💡 تمرير context
             ),
             centerTitle: true,
             automaticallyImplyLeading: false, 
             actions: [
               IconButton(
-                icon: const Icon(Icons.close),
+                // 💡 استخدام primaryColor
+                icon: Icon(Icons.close, color: primaryColor),
                 onPressed: () => Navigator.pop(context), 
               ),
             ],
@@ -53,6 +65,7 @@ class SideCartViewContents extends StatelessWidget {
                         itemCount: items.length,
                         itemBuilder: (context, index) {
                           final item = items[index];
+                          // يجب أن تكون CartItemWidget نفسها قد تم تكييفها للثيم الديناميكي
                           return CartItemWidget(item: item); 
                         },
                       ),
@@ -66,22 +79,28 @@ class SideCartViewContents extends StatelessWidget {
   }
   
   Widget _buildEmptyState(BuildContext context) {
+    // 💡 جلب الألوان الديناميكية
+    final Color primaryColor = Theme.of(context).colorScheme.primary; 
+    final Color secondaryColor = Theme.of(context).colorScheme.onSurface;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(40.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.shopping_cart_outlined, size: 80, color: Colors.grey),
+            // 💡 استخدام secondaryColor
+            Icon(Icons.shopping_cart_outlined, size: 80, color: secondaryColor.withOpacity(0.5)),
             const SizedBox(height: 20),
             Text(
               "Your cart is empty.",
-              style: _getTenorSansStyle(20),
+              style: _getTenorSansStyle(context, 20), // 💡 تمرير context
             ),
             const SizedBox(height: 10),
             Text(
               "Add items to your cart to see them here.",
-              style: _getTenorSansStyle(16).copyWith(color: Colors.grey.shade600),
+              // 💡 استخدام secondaryColor
+              style: _getTenorSansStyle(context, 16).copyWith(color: secondaryColor.withOpacity(0.7)),
               textAlign: TextAlign.center,
             ),
           ],
@@ -90,20 +109,27 @@ class SideCartViewContents extends StatelessWidget {
     );
   }
 
-  // دالة بناء الشريط السفلي لعملية الدفع (الحل الأمثل لـ Overflow)
+  // دالة بناء الشريط السفلي لعملية الدفع
   Widget _buildCheckoutBottomBar(BuildContext context, double totalAmount) {
-    // التعديل 1: تنسيق العملة مع تحديد عدد الأرقام العشرية (2)
+    // 💡 جلب الألوان الديناميكية
+    final Color primaryColor = Theme.of(context).colorScheme.primary; 
+    final Color secondaryColor = Theme.of(context).colorScheme.onSurface;
+    final Color cardColor = Theme.of(context).cardColor;
+    final Color accentGreen = Colors.green.shade700; // يبقى ثابتًا للأسعار المميزة
+
     final String totalPriceString = NumberFormat.currency(
         symbol: '\$',
-        decimalDigits: 2 // لضمان ظهور .00 أو أي أرقام عشرية
+        decimalDigits: 2 
     ).format(totalAmount);
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        // 💡 استخدام cardColor
+        color: cardColor,
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, -5)), 
+          // 💡 استخدام primaryColor للظل (بشفافية عالية لتجنب الظل القوي في الثيم الداكن)
+          BoxShadow(color: primaryColor.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5)), 
         ],
       ),
       child: SafeArea( 
@@ -112,7 +138,7 @@ class SideCartViewContents extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             
-            // 1. Total Price Column (استخدام Expanded مع قيود للنص)
+            // 1. Total Price Column
             Expanded( 
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -120,19 +146,19 @@ class SideCartViewContents extends StatelessWidget {
                 children: [
                   Text(
                     "Total",
-                    style: _getTenorSansStyle(16).copyWith(color: Colors.grey.shade600),
+                    // 💡 استخدام secondaryColor
+                    style: _getTenorSansStyle(context, 16).copyWith(color: secondaryColor.withOpacity(0.7)),
                   ),
                   Text(
                     totalPriceString,
-                    style: _getTenorSansStyle(24, color: Colors.green.shade700),
-                    maxLines: 1, // يجب أن يبقى سطر واحد
-                    overflow: TextOverflow.ellipsis, // لضمان عدم التجاوز إذا كان الرقم فلكياً
+                    style: _getTenorSansStyle(context, 24, color: accentGreen), // اللون الأخضر ثابت للسعر
+                    maxLines: 1, 
+                    overflow: TextOverflow.ellipsis, 
                   ),
                 ],
               ),
             ),
             
-            // مسافة ثابتة أنيقة
             const SizedBox(width: 16), 
 
             // 2. Checkout Button
@@ -143,17 +169,19 @@ class SideCartViewContents extends StatelessWidget {
                 );
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.black,
+                // 💡 استخدام primaryColor كخلفية للزر
+                backgroundColor: primaryColor,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
-                // التعديل 2: تقليل الـ padding لتقليل العرض الإجمالي للزر
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16), 
-                minimumSize: const Size(140, 50), // تقليل الحد الأدنى للعرض
+                minimumSize: const Size(140, 50), 
               ),
               child: Text(
                 "Checkout",
-                style: _getTenorSansStyle(18, weight: FontWeight.w600).copyWith(color: Colors.white),
+                style: _getTenorSansStyle(context, 18, weight: FontWeight.w600)
+                    // 💡 استخدام اللون المعاكس لـ primaryColor (المناسب للنص داخل الزر)
+                    .copyWith(color: Theme.of(context).colorScheme.onPrimary),
               ),
             ),
           ],

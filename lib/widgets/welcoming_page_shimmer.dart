@@ -2,43 +2,55 @@ import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 // يجب أن يكون هذا الملف هو مصدر تعريف الألوان
 import 'custom_form_widgets.dart'; 
+// ⚠️ ملاحظة: نحن لا نستخدم primaryText هنا بعد الآن.
 
 class WelcomingPageShimmer extends StatelessWidget {
   const WelcomingPageShimmer({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // نعتمد على أن primaryText و accentBlue معرفان في custom_form_widgets
+    // 💡 1. الحصول على لون النص الأساسي من الثيم
+    final Color primaryTextColor = Theme.of(context).colorScheme.primary; 
+    
+    // 💡 2. الحصول على لون التمييز الثانوي من الثيم (بدلاً من accentBlue الثابت)
+    // هذا اللون يفضل أن يكون ثابتًا في الثيم (مثل الأزرق)
+    final Color accentColor = Theme.of(context).colorScheme.secondary; 
+    
+    // 💡 3. لون رمادي يتغير مع الثيم: أفتح في الداكن وأغمق في الفاتح
+    final Color shimmerBaseColor = Theme.of(context).brightness == Brightness.dark 
+        ? Colors.grey.shade700 // أغمق قليلاً في الوضع الداكن
+        : Colors.grey.shade400; // أفتح قليلاً في الوضع الفاتح
+
     return Column(
       children: [
-        // 1. نص الترحيب العادي
-        const Text(
+        // 1. نص الترحيب العادي (Welcome to)
+        Text( // ⚠️ إزالة const إذا كان سيستخدم متغيراً ديناميكياً
           "Welcome to",
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.w300,
-            color: primaryText, 
+            color: primaryTextColor, // 👈 التعديل الحاسم: استخدام اللون الديناميكي للثيم
           ),
         ),
         const SizedBox(height: 5),
 
-        // 2. دمج Shimmer و RichText للتأثير المخصص (YS بلون ثابت، HOP يتوهج)
+        // 2. دمج Shimmer و RichText
         Shimmer.fromColors(
-          baseColor: Colors.grey.shade400, // لون نص "SHOP" المبدئي
-          highlightColor: accentBlue, // اللون الأزرق الجذاب الذي ينتشر
-          period: const Duration(seconds: 8), // فترة زمنية أطول لحركة أنيقة
+          baseColor: shimmerBaseColor, // 💡 استخدام اللون الديناميكي للشيمر
+          highlightColor: accentColor, // 💡 استخدام لون التمييز الديناميكي
+          period: const Duration(seconds: 8), 
           child: Text.rich(
             TextSpan(
               children: [
                 // YS بلون أزرق أنيق وثابت لتمييز العلامة
-                const TextSpan(
+                 TextSpan( // ⚠️ إزالة const لـ TextSpan
                   text: "YS",
                   style: TextStyle(
                     fontFamily: 'TenorSans',
                     fontSize: 60,
                     fontWeight: FontWeight.w900,
-                    color: accentBlue, 
+                    color: accentColor, // 💡 استخدام لون التمييز
                   ),
                 ),
                 // HOP بلون يتأثر بالشيمر الذي ينتشر من YS
@@ -48,7 +60,7 @@ class WelcomingPageShimmer extends StatelessWidget {
                     fontFamily: 'TenorSans',
                     fontSize: 60,
                     fontWeight: FontWeight.w900,
-                    color: Colors.grey.shade400, // اللون الأساسي للشيمر
+                    color: shimmerBaseColor, // 💡 استخدام لون الشيمر الأساسي
                   ),
                 ),
               ],

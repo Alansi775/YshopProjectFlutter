@@ -8,6 +8,8 @@ import '../widgets/side_menu_view_contents.dart';
 //  الإضافة المطلوبة: استيراد ملف سلة المشتريات الجانبية الجاهز
 import '../widgets/side_cart_view_contents.dart'; 
 import '../widgets/order_tracker_widget.dart'; // 💡 استيراد ودجت تتبع الطلب
+import 'package:provider/provider.dart'; 
+import '../state_management/cart_manager.dart'; 
 
 class CategoryHomeView extends StatefulWidget {
   const CategoryHomeView({Key? key}) : super(key: key); 
@@ -171,10 +173,58 @@ class _CategoryHomeViewState extends State<CategoryHomeView> {
                 ),
                 // زر سلة المشتريات (Side Cart)
                 actions: [
-                  Builder(
-                    builder: (context) => IconButton(
-                      icon: Icon(Icons.shopping_cart, color: Theme.of(context).colorScheme.onSurface),
-                      onPressed: () => Scaffold.of(context).openEndDrawer(),
+                  // ⚠️ سنقلل Padding الخارجي جداً، ونتحمل الاقتطاع الطفيف للحفاظ على الموقع الأصلي
+                  Padding(
+                    padding: const EdgeInsets.only(right: 5.0), // هامش بسيط لمنع القص الحاد
+                    child: Consumer<CartManager>(
+                      builder: (context, cartManager, child) {
+                        final totalItems = cartManager.totalItems;
+                        final primaryIconColor = Theme.of(context).colorScheme.onSurface;
+                        
+                        // ⭐️ نستخدم InkWell لتغليف الـ Stack بالكامل وجعل المنطقة قابلة للضغط ⭐️
+                        return InkWell(
+                          onTap: () => Scaffold.of(context).openEndDrawer(), 
+                          borderRadius: BorderRadius.circular(100), 
+                          
+                          child: Stack( 
+                            alignment: Alignment.center, 
+                            children: [
+                              // 1. أيقونة سلة المشتريات (Icon)
+                              // نستخدم Icon بدلاً من IconButton لأن الـ onTap في InkWell الخارجي
+                              Icon(Icons.shopping_cart, color: primaryIconColor, size: 28),
+                              
+                              // 2. الـ Badge (الموقع والتصميم الذي تفضله)
+                              if (totalItems > 0)
+                                Positioned(
+                                  right: 5, // الموقع الأصلي الذي طلبته
+                                  top: 0,   // الموقع الأصلي الذي طلبته
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.shade700, 
+                                      shape: BoxShape.circle, // الشكل الدائري الكلاسيكي
+                                    ),
+                                    constraints: const BoxConstraints(
+                                      minWidth: 18,
+                                      minHeight: 18,
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        totalItems > 99 ? '99+' : totalItems.toString(),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ],

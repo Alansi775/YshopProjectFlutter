@@ -2,6 +2,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
+import '../state_management/cart_manager.dart'; 
 
 // استيراد الشاشات والمكونات الصحيحة
 import 'store_detail_view.dart'; 
@@ -10,12 +12,11 @@ import '../widgets/side_cart_view_contents.dart';
 
 import '../models/store.dart';
 import '../widgets/store_card.dart';
-import '../widgets/custom_form_widgets.dart'; // للألوان
+
 
 // ----------------------------------------------------------------------
-// MARK: - تم حذف مكونات Placeholder.
+// MARK: - StoresListView
 // ----------------------------------------------------------------------
-
 
 class StoresListView extends StatefulWidget {
   final String categoryName;
@@ -32,11 +33,6 @@ class _StoresListViewState extends State<StoresListView> {
   String _errorMessage = "";
   
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-
-  // لافتراض وجود المتغيرات
-  final Color primaryText = Colors.black;
-  final Color secondaryText = Colors.grey;
-  final Color accentBlue = Colors.blue; 
 
   // MARK: - Lifecycle
   @override
@@ -73,20 +69,28 @@ class _StoresListViewState extends State<StoresListView> {
 
   // MARK: - Widgets
 
-  Widget get _loadingIndicator {
+  Widget _buildLoadingIndicator(BuildContext context) {
+    // 💡 جلب لون التمييز الديناميكي
+    final Color accentColor = Theme.of(context).colorScheme.secondary; 
+
     return Positioned.fill(
       child: Container(
-        color: Colors.black.withOpacity(0.1),
+        // لون شفاف خفيف يتبع الخلفية
+        color: Theme.of(context).scaffoldBackgroundColor.withOpacity(0.5), 
         child: Center(
           child: CircularProgressIndicator(
-            color: accentBlue,
+            color: accentColor,
           ),
         ),
       ),
     );
   }
 
-  Widget get _emptyStateView {
+  Widget _buildEmptyStateView(BuildContext context) {
+    // 💡 جلب الألوان الديناميكية
+    final Color primaryColor = Theme.of(context).colorScheme.primary; 
+    final Color secondaryColor = Theme.of(context).colorScheme.onSurface.withOpacity(0.6); 
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 80.0),
       child: Center(
@@ -96,7 +100,7 @@ class _StoresListViewState extends State<StoresListView> {
             Icon(
               Icons.storefront,
               size: 60,
-              color: secondaryText.withOpacity(0.3),
+              color: secondaryColor.withOpacity(0.3),
             ),
             const SizedBox(height: 20),
             Text(
@@ -104,7 +108,7 @@ class _StoresListViewState extends State<StoresListView> {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: primaryText,
+                color: primaryColor,
               ),
             ),
             const SizedBox(height: 5),
@@ -112,10 +116,9 @@ class _StoresListViewState extends State<StoresListView> {
               padding: const EdgeInsets.symmetric(horizontal: 40.0),
               child: Text(
                 "We couldn't find any ${widget.categoryName.toLowerCase()} stores in your area.",
-                // تم إزالة const
                 style: TextStyle( 
                   fontSize: 14,
-                  color: secondaryText,
+                  color: secondaryColor,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -126,6 +129,7 @@ class _StoresListViewState extends State<StoresListView> {
     );
   }
 
+  // 💡 التعديل: إضافة الدالة المساعدة المفقودة _buildWebContainer
   Widget _buildWebContainer({required Widget child}) {
     if (MediaQuery.of(context).size.width > 600) {
       return Center(
@@ -143,18 +147,21 @@ class _StoresListViewState extends State<StoresListView> {
   // MARK: - Main Build Method
   @override
   Widget build(BuildContext context) {
+    // 💡 جلب الألوان الأساسية هنا
+    final Color primaryColor = Theme.of(context).colorScheme.primary; 
+    final Color scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
     
     return Scaffold(
       key: _scaffoldKey, 
-      backgroundColor: Colors.white, 
-      drawer: Drawer(child: SideMenuViewContents()),
-      endDrawer: Drawer(child: SideCartViewContents()),
+      backgroundColor: scaffoldColor, 
+      drawer: const Drawer(child: SideMenuViewContents()),
+      endDrawer: const Drawer(child: SideCartViewContents()),
       
-      //  التعديل 1: إضافة AppBar هنا
+      //  التعديل 1: AppBar
       appBar: AppBar(
         // زر الرجوع (Leading) لليسار
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: primaryText),
+          icon: Icon(Icons.arrow_back, color: primaryColor),
           onPressed: () => Navigator.of(context).pop(), 
         ),
         
@@ -166,7 +173,7 @@ class _StoresListViewState extends State<StoresListView> {
             style: TextStyle(
               fontFamily: 'CinzelDecorative', 
               fontSize: 28,
-              color: primaryText,
+              color: primaryColor,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -174,30 +181,71 @@ class _StoresListViewState extends State<StoresListView> {
 
         // أيقونة السلة (Actions) لليمين
         actions: [
-          IconButton(
-            icon: Icon(Icons.shopping_cart, color: primaryText),
-            onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
-          ),
-        ],
-        // خصائص AppBar إضافية للتنسيق (ممكن أن تكون موروثة من Theme)
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
+                  // ⚠️ سنقلل Padding الخارجي جداً، ونتحمل الاقتطاع الطفيف للحفاظ على الموقع الأصلي
+                  Padding(
+                    padding: const EdgeInsets.only(right: 5.0), // هامش بسيط لمنع القص الحاد
+                    child: Consumer<CartManager>(
+                      builder: (context, cartManager, child) {
+                        final totalItems = cartManager.totalItems;
+                        final primaryIconColor = Theme.of(context).colorScheme.onSurface;
+                        
+                        // ⭐️ نستخدم InkWell لتغليف الـ Stack بالكامل وجعل المنطقة قابلة للضغط ⭐️
+                        return InkWell(
+                          onTap: () => Scaffold.of(context).openEndDrawer(), 
+                          borderRadius: BorderRadius.circular(100), 
+                          
+                          child: Stack( 
+                            alignment: Alignment.center, 
+                            children: [
+                              // 1. أيقونة سلة المشتريات (Icon)
+                              // نستخدم Icon بدلاً من IconButton لأن الـ onTap في InkWell الخارجي
+                              Icon(Icons.shopping_cart, color: primaryIconColor, size: 28),
+                              
+                              // 2. الـ Badge (الموقع والتصميم الذي تفضله)
+                              if (totalItems > 0)
+                                Positioned(
+                                  right: 5, // الموقع الأصلي الذي طلبته
+                                  top: 0,   // الموقع الأصلي الذي طلبته
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.shade700, 
+                                      shape: BoxShape.circle, // الشكل الدائري الكلاسيكي
+                                    ),
+                                    constraints: const BoxConstraints(
+                                      minWidth: 18,
+                                      minHeight: 18,
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        totalItems > 99 ? '99+' : totalItems.toString(),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
       ),
       
-      //  التعديل 2: إزالة SafeArea حول الـ body واستبدالها بالـ SingleChildScrollView مباشرة
+      //  التعديل 2: Body
       body: Stack(
         children: [
           SingleChildScrollView(
-            // يجب تطبيق الـ Padding الأفقي خارج الـ buildWebContainer أو ضمنها
-            // لإزالة الـ Row المخصص (Header) الذي كان موجوداً
             child: Column(
               children: [
-                //  التعديل 3: تم حذف الـ Row المخصص للـ Header هنا
-                // --------------------------------------------------------------------------------
-
                 // Content Header & Grid
-                _buildWebContainer(
+                _buildWebContainer( // 💡 الآن الدالة معرّفة ولن يحدث خطأ
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -212,16 +260,15 @@ class _StoresListViewState extends State<StoresListView> {
                               style: TextStyle(
                                 fontSize: 34,
                                 fontWeight: FontWeight.bold,
-                                color: primaryText,
+                                color: primaryColor,
                               ),
                             ),
                             const SizedBox(height: 8),
                             Text(
                               "${_stores.length} locations available",
-                              // تم إزالة const
                               style: TextStyle(
                                 fontSize: 14,
-                                color: secondaryText,
+                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                               ),
                             ),
                           ],
@@ -230,7 +277,7 @@ class _StoresListViewState extends State<StoresListView> {
 
                       // Store Grid
                       if (_stores.isEmpty && !_isLoading)
-                        _emptyStateView
+                        _buildEmptyStateView(context)
                       else if (_stores.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 20.0),
@@ -268,7 +315,7 @@ class _StoresListViewState extends State<StoresListView> {
           ),
           
           // Loading Indicator 
-          if (_isLoading) _loadingIndicator,
+          if (_isLoading) _buildLoadingIndicator(context),
         ],
       ),
     );

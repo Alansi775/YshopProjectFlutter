@@ -1,13 +1,11 @@
 // lib/widgets/custom_form_widgets.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 
-// MARK: - Custom Colors (مكافئ لـ extension Color في SwiftUI)
-// يجب أن تكون هذه الألوان معرفة في ملف الثيم (Theme) الرئيسي، لكن سنعرفها هنا مؤقتاً
-const Color accentBlue = Color.fromRGBO(64, 128, 230, 1.0); // 0.25, 0.5, 0.9
-const Color primaryText = Color.fromRGBO(26, 26, 26, 1.0); // 0.1, 0.1, 0.1
-const Color secondaryText = Color.fromRGBO(102, 102, 102, 1.0); // 0.4, 0.4, 0.4
-const Color backgroundGray = Color.fromRGBO(247, 247, 250, 1.0); // 0.97, 0.97, 0.98
-const Color dividerGray = Color.fromRGBO(217, 217, 222, 1.0); // 0.85, 0.85, 0.87
+
+// MARK: - Custom Colors (احتفظنا بالثوابت فقط إن كانت ضرورية لألوان محددة، لكن يفضل استخدام الثيم)
+// سنحتفظ بـ accentBlue فقط، والباقي سيُستبدل بألوان الثيم
+const Color accentBlue = Color.fromRGBO(64, 128, 230, 1.0); // لون تمييز ثابت إذا لزم الأمر
 
 // MARK: - Custom TextField Styles (UnderlinedTextField)
 class UnderlinedTextField extends StatelessWidget {
@@ -15,6 +13,7 @@ class UnderlinedTextField extends StatelessWidget {
   final TextEditingController controller;
   final TextInputType keyboardType;
   final bool isPassword;
+  final ValueChanged<String>? onSubmitted;
 
   const UnderlinedTextField({
     Key? key,
@@ -22,26 +21,37 @@ class UnderlinedTextField extends StatelessWidget {
     required this.controller,
     this.keyboardType = TextInputType.text,
     this.isPassword = false,
+    this.onSubmitted,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    // نستخدم TextSelectionTheme لتغيير لون المؤشر والتضليل والمقابض
+    // 💡 1. استخراج الألوان من الثيم
+    // primaryColor: للخط الأساسي والكتابة (أسود في الفاتح، أبيض في الداكن)
+    final Color primaryColor = Theme.of(context).colorScheme.primary; 
+    // secondaryColor: للنصوص الثانوية (مثل الـ placeholder)
+    final Color secondaryColor = Theme.of(context).colorScheme.onSurface.withOpacity(0.6); 
+    // dividerColor: لون الخط الفاصل
+    final Color dividerColor = Theme.of(context).dividerColor; 
+
+    // 💡 2. TextSelectionThemeData: المؤشر والتضليل
     return TextSelectionTheme(
       data: TextSelectionThemeData(
-        cursorColor: primaryText, // لون المؤشر (أسود)
-        selectionColor: primaryText.withOpacity(0.3), // لون التضليل (أسود شفاف)
-        selectionHandleColor: primaryText, // لون مقابض التحديد
+        // استخدام اللون الأساسي للثيم
+        cursorColor: primaryColor, 
+        selectionColor: primaryColor.withOpacity(0.3), 
+        selectionHandleColor: primaryColor, 
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          // Placeholder as a label above the field (مكافئ لـ Text(placeholder))
+          // Placeholder as a label above the field
           Text(
             placeholder,
-            style: const TextStyle(
+            style: TextStyle( // ⚠️ إزالة const
               fontSize: 12,
-              color: secondaryText,
+              // 💡 استخدام اللون الثانوي الديناميكي
+              color: secondaryColor,
             ),
           ),
           const SizedBox(height: 6),
@@ -50,21 +60,28 @@ class UnderlinedTextField extends StatelessWidget {
             controller: controller,
             obscureText: isPassword,
             keyboardType: keyboardType,
-            style: const TextStyle(color: primaryText),
+            // 💡 التعديل الحاسم: تعيين لون الكتابة (style) ليعتمد على الثيم
+            style: TextStyle(
+              color: primaryColor, // سيصبح أبيض في الوضع الداكن
+              fontSize: 16,
+            ),
             textCapitalization: (keyboardType == TextInputType.emailAddress || isPassword) 
                 ? TextCapitalization.none 
                 : TextCapitalization.words,
+            textInputAction: onSubmitted != null ? TextInputAction.go : TextInputAction.next,
+            onSubmitted: onSubmitted,
             decoration: const InputDecoration(
               isDense: true,
               contentPadding: EdgeInsets.zero,
               border: InputBorder.none, // إزالة الحدود الافتراضية
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.only(top: 8.0),
+          Padding( // ⚠️ إزالة const
+            padding: const EdgeInsets.only(top: 8.0),
             child: Divider(
               height: 1,
-              color: dividerGray,
+              // 💡 استخدام لون الفاصل الديناميكي
+              color: dividerColor,
             ),
           ),
         ],
@@ -73,15 +90,18 @@ class UnderlinedTextField extends StatelessWidget {
   }
 }
 
-// MARK: - UnderlinedSecureField (يستخدم نفس الـ Widget لكن مع isPassword = true)
+// MARK: - UnderlinedSecureField
+// هذا لا يحتاج إلى تعديل لأنه يستخدم UnderlinedTextField
 class UnderlinedSecureField extends StatelessWidget {
   final String placeholder;
   final TextEditingController controller;
+  final ValueChanged<String>? onSubmitted; 
 
   const UnderlinedSecureField({
     Key? key,
     required this.placeholder,
     required this.controller,
+    this.onSubmitted,
   }) : super(key: key);
 
   @override
@@ -91,6 +111,7 @@ class UnderlinedSecureField extends StatelessWidget {
       controller: controller,
       isPassword: true,
       keyboardType: TextInputType.visiblePassword,
+      onSubmitted: onSubmitted,
     );
   }
 }
@@ -99,35 +120,50 @@ class UnderlinedSecureField extends StatelessWidget {
 class PrimaryActionButton extends StatelessWidget {
   final String title;
   final VoidCallback action;
+  final bool isLoading;
 
   const PrimaryActionButton({
     Key? key,
     required this.title,
     required this.action,
+    this.isLoading = false,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    // 💡 الحصول على لون التمييز من الثيم (يفترض أنه accentBlue أو ما شابه)
+    final Color accentColor = Theme.of(context).colorScheme.secondary; 
+    
     return Padding(
       padding: const EdgeInsets.only(top: 15.0),
       child: ElevatedButton(
-        onPressed: action,
+        onPressed: isLoading ? null : action,
         style: ElevatedButton.styleFrom(
-          backgroundColor: accentBlue, // خلفية الزر
-          foregroundColor: Colors.white, // لون النص
+          // 💡 استخدام لون التمييز الديناميكي
+          backgroundColor: accentColor, 
+          foregroundColor: Colors.white, // النص يبقى أبيض لتحقيق التباين
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          minimumSize: const Size(double.infinity, 50), // توسيع الزر بالكامل
+          minimumSize: const Size(double.infinity, 50), 
           padding: const EdgeInsets.symmetric(vertical: 15),
-          shadowColor: accentBlue.withOpacity(0.3),
+          // 💡 استخدام لون التمييز في الظل
+          shadowColor: accentColor.withOpacity(0.3), 
           elevation: 8,
         ),
-        child: Text(
-          title,
-          style: const TextStyle(
-            fontSize: 16, // مكافئ لـ .headline
-            fontWeight: FontWeight.w600, // مكافئ لـ .semibold
+        child: isLoading 
+            ? const SizedBox(
+                height: 20, 
+                width: 20,
+                child: CupertinoActivityIndicator(
+                  color: Colors.white,
+                ),
+              )
+            : Text( // ⚠️ أضفنا const مرة أخرى هنا إذا كان النص ثابتاً
+                title,
+                style: TextStyle(
+                  fontSize: 16, 
+                  fontWeight: FontWeight.w600, 
           ),
         ),
       ),

@@ -3,18 +3,20 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-
+import 'package:provider/provider.dart';
+import '../state_management/cart_manager.dart'; 
 import '../models/store.dart';
 import '../models/product.dart';
 import '../widgets/product_card.dart';
-import '../widgets/custom_form_widgets.dart'; // للألوان
-import '../widgets/side_cart_view_contents.dart'; // لزر السلة
+// ⚠️ تم حذف استيراد custom_form_widgets.dart لأنه غير مستخدم
+// import '../widgets/custom_form_widgets.dart'; // للألوان
+import '../widgets/side_cart_view_contents.dart'; 
 
 // !!! الاستيراد الحقيقي لشاشة تفاصيل المنتج !!!
 import 'product_detail_view.dart'; 
 
 // ----------------------------------------------------------------------
-// MARK: - تم إزالة Placeholder for ProductDetailView (Sheet)
+// MARK: - StoreDetailView
 // ----------------------------------------------------------------------
 
 
@@ -32,13 +34,12 @@ class _StoreDetailViewState extends State<StoreDetailView> {
   bool _isLoading = false;
   String _errorMessage = "";
   
-  // لفتح الـ Drawers (القوائم الجانبية)
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  // لافتراض وجود المتغيرات
-  final Color primaryText = Colors.black;
-  final Color secondaryText = Colors.grey;
-  final Color accentBlue = Colors.blue;
+  // ⚠️ تم حذف تعريفات الألوان الثابتة هنا:
+  // final Color primaryText = Colors.black;
+  // final Color secondaryText = Colors.grey;
+  // final Color accentBlue = Colors.blue;
 
   // MARK: - Lifecycle
   @override
@@ -77,7 +78,11 @@ class _StoreDetailViewState extends State<StoreDetailView> {
   // MARK: - View Components
 
   // مكافئ لـ StoreHeaderSection()
-  Widget _buildStoreHeaderSection() {
+  Widget _buildStoreHeaderSection(BuildContext context) {
+    // 💡 جلب الألوان الديناميكية
+    final Color primaryColor = Theme.of(context).colorScheme.primary; 
+    final Color secondaryColor = Theme.of(context).colorScheme.onSurface;
+
     return Padding(
       padding: const EdgeInsets.only(top: 20.0, bottom: 10.0),
       child: Column(
@@ -88,17 +93,23 @@ class _StoreDetailViewState extends State<StoreDetailView> {
             height: 120,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.grey.shade300,
+              // 💡 استخدام لون يتغير مع الثيم (مثلاً: لون البطاقة مع تقليل الشفافية)
+              color: Theme.of(context).cardColor.withOpacity(0.8),
               boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8),
+                BoxShadow(color: primaryColor.withOpacity(0.1), blurRadius: 8),
               ],
             ),
             child: ClipOval(
               child: CachedNetworkImage(
                 imageUrl: widget.store.storeIconUrl,
                 fit: BoxFit.cover,
-                placeholder: (context, url) => Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                errorWidget: (context, url, error) => const Center(child: Icon(Icons.storefront, size: 60, color: Colors.grey)),
+                placeholder: (context, url) => Center(child: CircularProgressIndicator(
+                  strokeWidth: 2, 
+                  color: secondaryColor.withOpacity(0.6), // 💡 استخدام لون ثانوي
+                )),
+                errorWidget: (context, url, error) => Center(
+                  child: Icon(Icons.storefront, size: 60, color: secondaryColor.withOpacity(0.6)), // 💡 استخدام لون ثانوي
+                ),
               ),
             ),
           ),
@@ -108,10 +119,10 @@ class _StoreDetailViewState extends State<StoreDetailView> {
           // Store Info
           Text(
             widget.store.storeName,
-            style: TextStyle(
+            style: TextStyle( // ⚠️ إزالة const
               fontSize: 24, 
               fontWeight: FontWeight.bold,
-              color: primaryText,
+              color: primaryColor, // 💡 استخدام primaryColor
             ),
           ),
           const SizedBox(height: 12),
@@ -123,12 +134,12 @@ class _StoreDetailViewState extends State<StoreDetailView> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.location_on, size: 18, color: secondaryText),
+                  Icon(Icons.location_on, size: 18, color: secondaryColor), // 💡 استخدام secondaryColor
                   const SizedBox(width: 8),
                   Flexible(
                     child: Text(
                       widget.store.address!,
-                      style: TextStyle(fontSize: 15, color: secondaryText),
+                      style: TextStyle(fontSize: 15, color: secondaryColor), // 💡 استخدام secondaryColor
                       textAlign: TextAlign.center,
                     ),
                   ),
@@ -142,11 +153,11 @@ class _StoreDetailViewState extends State<StoreDetailView> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.phone, size: 18, color: secondaryText),
+                Icon(Icons.phone, size: 18, color: secondaryColor), // 💡 استخدام secondaryColor
                 const SizedBox(width: 8),
                 Text(
                   widget.store.storePhoneNumber!,
-                  style: TextStyle(fontSize: 15, color: secondaryText),
+                  style: TextStyle(fontSize: 15, color: secondaryColor), // 💡 استخدام secondaryColor
                 ),
               ],
             ),
@@ -158,7 +169,7 @@ class _StoreDetailViewState extends State<StoreDetailView> {
   // مكافئ لـ ProductsGridSection()
   Widget _buildProductsGridSection() {
     if (_products.isEmpty && !_isLoading) {
-      return _buildEmptyStateView();
+      return _buildEmptyStateView(context); // 💡 تمرير context
     }
     
     return Padding(
@@ -178,7 +189,6 @@ class _StoreDetailViewState extends State<StoreDetailView> {
           return ProductCard(
             product: product,
             onTap: () {
-              // محاكاة لـ .sheet(item: $selectedProduct)
               _showProductDetailSheet(product);
             },
           );
@@ -188,7 +198,11 @@ class _StoreDetailViewState extends State<StoreDetailView> {
   }
 
   // مكافئ لـ EmptyStateView()
-  Widget _buildEmptyStateView() {
+  Widget _buildEmptyStateView(BuildContext context) {
+    // 💡 جلب الألوان الديناميكية
+    final Color primaryColor = Theme.of(context).colorScheme.primary; 
+    final Color secondaryColor = Theme.of(context).colorScheme.onSurface;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 60.0, horizontal: 40.0),
       child: Center(
@@ -198,23 +212,23 @@ class _StoreDetailViewState extends State<StoreDetailView> {
             Icon(
               Icons.inventory_2_outlined,
               size: 60,
-              color: secondaryText.withOpacity(0.5),
+              color: secondaryColor.withOpacity(0.5), // 💡 استخدام secondaryColor
             ),
             const SizedBox(height: 20),
             Text(
               "No Products Available",
-              style: TextStyle(
+              style: TextStyle( // ⚠️ إزالة const
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: primaryText,
+                color: primaryColor, // 💡 استخدام primaryColor
               ),
             ),
             const SizedBox(height: 5),
             Text(
               "This store hasn't added any products yet.",
-              style: TextStyle(
+              style: TextStyle( // ⚠️ إزالة const
                 fontSize: 14,
-                color: secondaryText,
+                color: secondaryColor, // 💡 استخدام secondaryColor
               ),
               textAlign: TextAlign.center,
             ),
@@ -225,14 +239,17 @@ class _StoreDetailViewState extends State<StoreDetailView> {
   }
   
   // مكافئ لـ ErrorMessageView
-  Widget _buildErrorMessageView() {
+  Widget _buildErrorMessageView(BuildContext context) {
+    // 💡 جلب الألوان الديناميكية
+    final Color cardColor = Theme.of(context).cardColor;
+    
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: cardColor, // 💡 استخدام لون البطاقة
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: Colors.red.shade300)
           ),
@@ -251,15 +268,14 @@ class _StoreDetailViewState extends State<StoreDetailView> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      // نستخدم Container لتحديد ارتفاع الشاشة (إذا لم تحدد، يأخذ ارتفاع الشاشة)
-      // ونستخدم isScrollControlled: true لجعلها ملء الشاشة تقريباً
       builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.95, // تجعلها 95% من ارتفاع الشاشة
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        height: MediaQuery.of(context).size.height * 0.95,
+        decoration: BoxDecoration(
+          // 💡 استخدام لون الخلفية الديناميكي
+          color: Theme.of(context).scaffoldBackgroundColor, 
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
-        child: ProductDetailView(product: product), // استخدام الكلاس الحقيقي
+        child: ProductDetailView(product: product), 
       ),
     );
   }
@@ -280,16 +296,21 @@ class _StoreDetailViewState extends State<StoreDetailView> {
   }
   
   // مكافئ لـ LoadingIndicator()
-  Widget get _loadingIndicator {
+  Widget _buildLoadingIndicator(BuildContext context) {
+    // 💡 جلب الألوان الديناميكية
+    final Color accentColor = Theme.of(context).colorScheme.secondary;
+    final Color cardColor = Theme.of(context).cardColor;
+    
     return Center(
       child: Container(
         padding: const EdgeInsets.all(25),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.9),
+          // 💡 استخدام لون البطاقة بشفافية
+          color: cardColor.withOpacity(0.9),
           borderRadius: BorderRadius.circular(16),
         ),
         child: CircularProgressIndicator(
-          color: accentBlue,
+          color: accentColor, // 💡 استخدام accentColor
           strokeWidth: 3,
         ),
       ),
@@ -297,48 +318,107 @@ class _StoreDetailViewState extends State<StoreDetailView> {
   }
 
   // MARK: - Main Build Method
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      key: _scaffoldKey,
-      backgroundColor: Colors.white,
-      // نستخدم AppBar عادي هنا مع زر السلة في الـ actions
-      appBar: AppBar(
-        title: Text(widget.store.storeName),
-        actions: [
-          // زر سلة المشتريات (Side Cart)
-          IconButton(
-            icon: Icon(Icons.shopping_cart, color: primaryText),
-            onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
-          ),
-        ],
-      ),
-      // تم إزالة const لتجنب خطأ "Not a constant expression"
-      endDrawer: Drawer(child: SideCartViewContents()),
+ @override
+Widget build(BuildContext context) {
+  // 💡 جلب الألوان الأساسية هنا
+  final Color primaryColor = Theme.of(context).colorScheme.primary;
+  final Color scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
+  
+  return Scaffold(
+    key: _scaffoldKey,
+    // 💡 استخدام لون الخلفية الديناميكي
+    backgroundColor: scaffoldColor,
+    // نستخدم AppBar عادي هنا مع زر السلة في الـ actions
+    appBar: AppBar(
+      title: Text(widget.store.storeName, style: TextStyle(color: primaryColor)),
+      // 💡 استخدام لون الخلفية الديناميكي
+      backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+      // 💡 استخدام primaryColor للأيقونات والتكست
+      foregroundColor: primaryColor,
       
-      body: Stack(
-        children: [
-          SingleChildScrollView(
-            // اللون الرمادي الفاتح (systemGroupedBackground) يتم محاكاته بمسافة حول المحتوى
-            child: Container(
-              color: Colors.grey.shade50, // محاكاة لـ systemGroupedBackground
-              child: _buildWebContainer(
-                child: Column(
-                  children: [
-                    _buildStoreHeaderSection(),
-                    _buildProductsGridSection(),
-                    const SizedBox(height: 30),
-                  ],
-                ),
+      // ⭐️⭐️ هذا هو التصحيح: وضع Consumer داخل مصفوفة actions ⭐️⭐️
+      actions: [
+                  // ⚠️ سنقلل Padding الخارجي جداً، ونتحمل الاقتطاع الطفيف للحفاظ على الموقع الأصلي
+                  Padding(
+                    padding: const EdgeInsets.only(right: 5.0), // هامش بسيط لمنع القص الحاد
+                    child: Consumer<CartManager>(
+                      builder: (context, cartManager, child) {
+                        final totalItems = cartManager.totalItems;
+                        final primaryIconColor = Theme.of(context).colorScheme.onSurface;
+                        
+                        // ⭐️ نستخدم InkWell لتغليف الـ Stack بالكامل وجعل المنطقة قابلة للضغط ⭐️
+                        return InkWell(
+                          onTap: () => Scaffold.of(context).openEndDrawer(), 
+                          borderRadius: BorderRadius.circular(100), 
+                          
+                          child: Stack( 
+                            alignment: Alignment.center, 
+                            children: [
+                              // 1. أيقونة سلة المشتريات (Icon)
+                              // نستخدم Icon بدلاً من IconButton لأن الـ onTap في InkWell الخارجي
+                              Icon(Icons.shopping_cart, color: primaryIconColor, size: 28),
+                              
+                              // 2. الـ Badge (الموقع والتصميم الذي تفضله)
+                              if (totalItems > 0)
+                                Positioned(
+                                  right: 5, // الموقع الأصلي الذي طلبته
+                                  top: 0,   // الموقع الأصلي الذي طلبته
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.shade700, 
+                                      shape: BoxShape.circle, // الشكل الدائري الكلاسيكي
+                                    ),
+                                    constraints: const BoxConstraints(
+                                      minWidth: 18,
+                                      minHeight: 18,
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        totalItems > 99 ? '99+' : totalItems.toString(),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ], // ⭐️⭐️ يجب أن تكون مصفوفة الـ actions مغلقة هنا ⭐️⭐️
+    ),
+    endDrawer: const Drawer(child: SideCartViewContents()),
+    
+    body: Stack(
+      children: [
+        SingleChildScrollView(
+          // 💡 محاكاة لـ systemGroupedBackground باستخدام لون الخلفية الأساسي
+          child: Container(
+            color: scaffoldColor, 
+            child: _buildWebContainer(
+              child: Column(
+                children: [
+                  _buildStoreHeaderSection(context), // 💡 تمرير context
+                  _buildProductsGridSection(),
+                  const SizedBox(height: 30),
+                ],
               ),
             ),
           ),
-          
-          // عرض حالة الخطأ أو التحميل
-          if (_errorMessage.isNotEmpty) _buildErrorMessageView(),
-          if (_isLoading) _loadingIndicator,
-        ],
-      ),
-    );
-  }
+        ),
+        
+        // عرض حالة الخطأ أو التحميل
+        if (_errorMessage.isNotEmpty) _buildErrorMessageView(context), // 💡 تمرير context
+        if (_isLoading) _buildLoadingIndicator(context), // 💡 تمرير context
+      ],
+    ),
+  );
+}
 }

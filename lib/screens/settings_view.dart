@@ -215,7 +215,7 @@ class _SettingsViewState extends State<SettingsView> {
     final themeSwitch = Switch.adaptive(
       value: themeManager.isDarkMode,
       onChanged: (bool newValue) {
-        themeManager.toggleTheme(newValue);
+        themeManager.switchTheme(); 
       },
       activeColor: iconColor,
     );

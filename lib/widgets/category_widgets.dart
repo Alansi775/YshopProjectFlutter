@@ -1,11 +1,10 @@
-// lib/widgets/category_widgets.dart (الكود المصحح)
+// lib/widgets/category_widgets.dart (الكود المصحح والنهائي)
 
 import 'package:flutter/material.dart';
 import '../screens/stores_list_view.dart'; 
-import '../widgets/custom_form_widgets.dart'; 
 
 // -------------------------------------------------------------
-// MARK: - Category Mappings 
+// MARK: - Category Mappings (تبقى ثابتة)
 // -------------------------------------------------------------
 const Map<String, IconData> categoryIconMappings = {
   "Food": Icons.restaurant_menu_rounded,
@@ -16,11 +15,11 @@ const Map<String, IconData> categoryIconMappings = {
 };
 
 const Map<String, Color> categoryColorMappings = {
-  "Food": Color.fromRGBO(232, 181, 130, 1.0), 
-  "Pharmacy": Color.fromRGBO(143, 201, 250, 1.0), 
-  "Clothes": Color.fromRGBO(209, 158, 232, 1.0), 
-  "Market": Color.fromRGBO(168, 222, 168, 1.0), 
-  "Restaurants": Color.fromRGBO(250, 153, 153, 1.0),
+  "Food": Color.fromRGBO(232, 181, 130, 1.0), // ثابت
+  "Pharmacy": Color.fromRGBO(143, 201, 250, 1.0), // ثابت
+  "Clothes": Color.fromRGBO(209, 158, 232, 1.0), // ثابت
+  "Market": Color.fromRGBO(168, 222, 168, 1.0), // ثابت
+  "Restaurants": Color.fromRGBO(250, 153, 153, 1.0), // ثابت
 };
 
 
@@ -37,17 +36,17 @@ class CategoryCard extends StatefulWidget {
 }
 
 class _CategoryCardState extends State<CategoryCard> {
-  // الحالة لتطبيق تأثير onHover
   bool _isHovering = false;
   
-  // لافتراض وجود المتغير primaryText في custom_form_widgets.dart
-  // وإلا استخدم Colors.black
-  final Color primaryText = Colors.black; 
-
   @override
   Widget build(BuildContext context) {
+    // 💡 الحصول على الألوان الديناميكية للخلفية والنص
+    final Color primaryColor = Theme.of(context).colorScheme.primary; 
+    final Color cardBackgroundColor = Theme.of(context).cardColor;
+    
+    // الألوان والأيقونات الثابتة للفئة
     final iconName = categoryIconMappings[widget.category] ?? Icons.category_rounded;
-    final cardColor = categoryColorMappings[widget.category] ?? Colors.grey;
+    final cardColor = categoryColorMappings[widget.category] ?? Colors.grey; 
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovering = true),
@@ -60,7 +59,8 @@ class _CategoryCardState extends State<CategoryCard> {
           height: 160,
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: Colors.white, 
+            // 💡 التعديل: استخدام لون البطاقة الديناميكي
+            color: cardBackgroundColor, 
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
@@ -77,7 +77,8 @@ class _CategoryCardState extends State<CategoryCard> {
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: cardColor,
+                  // ⚠️ هذا اللون يبقى ثابتًا لتحديد الفئة
+                  color: cardColor, 
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withOpacity(0.2),
@@ -89,17 +90,18 @@ class _CategoryCardState extends State<CategoryCard> {
                 child: Icon(
                   iconName,
                   size: 40,
-                  color: Colors.white,
+                  color: Colors.white, // لون الأيقونة داخل الدائرة يبقى أبيض
                 ),
               ),
               const SizedBox(height: 10),
+              // 💡 التعديل: استخدام اللون الأساسي الديناميكي للنص
               Text(
                 widget.category,
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: TextStyle( // ⚠️ إزالة const
                   fontSize: 16, 
                   fontWeight: FontWeight.w600,
-                  color: primaryText, 
+                  color: primaryColor, // سيصبح أبيض في الوضع الداكن
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -122,23 +124,23 @@ class CategoriesGridView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // لافتراض وجود المتغير primaryText في custom_form_widgets.dart
-    // وإلا استخدم Colors.black
-    final Color primaryText = Colors.black;
+    // 💡 الحصول على اللون الأساسي للنص
+    final Color primaryColor = Theme.of(context).colorScheme.primary; 
     
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20.0),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start, // جعل النص يبدأ من اليسار
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
             padding: const EdgeInsets.only(left: 10, bottom: 30),
             child: Text(
               "Explore Categories",
-              style: TextStyle(
+              // 💡 التعديل: استخدام اللون الأساسي الديناميكي للنص (لحل مشكلة اللون الأسود الثابت)
+              style: TextStyle( // ⚠️ إزالة const
                 fontSize: 20, 
                 fontWeight: FontWeight.w600,
-                color: primaryText,
+                color: primaryColor, 
               ),
               textAlign: TextAlign.start,
             ),
@@ -159,7 +161,6 @@ class CategoriesGridView extends StatelessWidget {
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      // استخدام الكلاس الكامل والمستورد
                       builder: (context) => StoresListView(categoryName: category), 
                     ),
                   );
@@ -182,11 +183,36 @@ class BrandShowcaseView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // تأكد من أن 'assets/images/Brand.png' موجود في مشروعك
+    final Brightness brightness = Theme.of(context).brightness;
+    final Color cardBackgroundColor = Theme.of(context).cardColor;
+    
+    // 1. إنشاء ويدجت الصورة الأصلية
+    Widget brandImage = Image.asset(
+      'assets/images/Brand.png', 
+      fit: BoxFit.cover,
+      height: 190,
+    );
+
+    // 2. تطبيق فلتر الألوان إذا كان الوضع داكناً
+    if (brightness == Brightness.dark) {
+      // 💡 ColorFilter.matrix لعكس الألوان (تحويل الأسود إلى أبيض)
+      brandImage = ColorFiltered(
+        // هذه المصفوفة تعكس قيم الألوان (R, G, B) مما يحول الأسود (0) إلى أبيض (255)
+        colorFilter: const ColorFilter.matrix(<double>[
+          -1, 0, 0, 0, 255, // Red
+          0, -1, 0, 0, 255, // Green
+          0, 0, -1, 0, 255, // Blue
+          0, 0, 0, 1, 0, // Alpha
+        ]),
+        child: brandImage,
+      );
+    }
+    
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 40),
       child: Container(
         decoration: BoxDecoration(
+          color: cardBackgroundColor, // لون الخلفية يتغير ديناميكياً
           borderRadius: BorderRadius.circular(15),
           boxShadow: [
             BoxShadow(
@@ -198,11 +224,7 @@ class BrandShowcaseView extends StatelessWidget {
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(15),
-          child: Image.asset(
-            'assets/images/Brand.png', 
-            fit: BoxFit.cover,
-            height: 190,
-          ),
+          child: brandImage, // استخدام الصورة التي تم تطبيق الفلتر عليها
         ),
       ),
     );

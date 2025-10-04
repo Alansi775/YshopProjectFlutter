@@ -1,7 +1,9 @@
+// lib/screens/product_detail_view.dart
+
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart'; 
-import 'package:firebase_auth/firebase_auth.dart'; // لاستخدام معلومات المستخدم في الدردشة
+import 'package:firebase_auth/firebase_auth.dart';
 
 // نماذج البيانات
 import '../models/product.dart';
@@ -27,41 +29,49 @@ class _ProductDetailViewState extends State<ProductDetailView> {
   // MARK: - State Variables
   int _quantity = 1;
   
-  // لافتراض وجود الألوان
-  final Color primaryText = Colors.black;
-  final Color secondaryText = Colors.grey;
-  final Color greenColor = Colors.green.shade700;
-  final String fontTenor = 'TenorSans'; 
+  // ⚠️ تم حذف تعريفات الألوان الثابتة هنا
+  // final Color primaryText = Colors.black;
+  // final Color secondaryText = Colors.grey;
+  // final Color greenColor = Colors.green.shade700;
+  
+  final String fontTenor = 'TenorSans'; // يبقى ثابتًا كاسم خط
 
   // MARK: - Helper Methods
 
-  TextStyle _getTenorSansStyle(double size, {FontWeight weight = FontWeight.normal, Color? color}) {
+  // 💡 تم تعديل الدالة لتقبل اللون الأساسي الديناميكي
+  TextStyle _getTenorSansStyle(BuildContext context, double size, {FontWeight weight = FontWeight.normal, Color? color}) {
+    final Color primaryColor = Theme.of(context).colorScheme.primary; 
     return TextStyle(
       fontFamily: fontTenor,
       fontSize: size,
       fontWeight: weight,
-      color: color ?? primaryText,
+      color: color ?? primaryColor, // 💡 استخدام primaryColor افتراضياً
     );
   }
 
   // MARK: - View Components
 
-  Widget _buildQuantitySelector() {
+  Widget _buildQuantitySelector(BuildContext context) {
+    // 💡 جلب الألوان الديناميكية
+    final Color cardColor = Theme.of(context).cardColor;
+    final Color primaryColor = Theme.of(context).colorScheme.primary; 
+
     return Container(
       padding: const EdgeInsets.all(16),
       margin: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        // 💡 استخدام cardColor
+        color: cardColor,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2)),
+          BoxShadow(color: primaryColor.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2)),
         ],
       ),
       child: Row(
         children: [
           Text(
             "Quantity:",
-            style: _getTenorSansStyle(18),
+            style: _getTenorSansStyle(context, 18), // 💡 تمرير context
           ),
           const Spacer(),
           Row(
@@ -76,7 +86,7 @@ class _ProductDetailViewState extends State<ProductDetailView> {
                     }
                   });
                 },
-                child: Icon(
+                child: const Icon(
                   Icons.remove_circle,
                   color: Colors.red,
                   size: 30,
@@ -86,7 +96,7 @@ class _ProductDetailViewState extends State<ProductDetailView> {
               
               Text(
                 "$_quantity",
-                style: _getTenorSansStyle(24),
+                style: _getTenorSansStyle(context, 24), // 💡 تمرير context
               ),
               
               const SizedBox(width: 20),
@@ -99,7 +109,7 @@ class _ProductDetailViewState extends State<ProductDetailView> {
                 },
                 child: Icon(
                   Icons.add_circle,
-                  color: greenColor,
+                  color: Colors.green.shade700, // اللون الأخضر ثابت للـ +
                   size: 30,
                 ),
               ),
@@ -110,22 +120,25 @@ class _ProductDetailViewState extends State<ProductDetailView> {
     );
   }
 
-  // دالة بناء معلومات المتجر (مصححة للتعامل مع String? storePhone)
-  Widget _buildStoreInfo() {
-    // نحصل على قيمة storePhone بأمان
-    final storePhone = widget.product.storePhone;
+  // دالة بناء معلومات المتجر
+  Widget _buildStoreInfo(BuildContext context) {
+    // 💡 جلب الألوان الديناميكية
+    final Color cardColor = Theme.of(context).cardColor;
+    final Color primaryColor = Theme.of(context).colorScheme.primary;
+    final Color secondaryColor = Theme.of(context).colorScheme.onSurface; 
     
-    // نتحقق من أن قيمة الهاتف ليست null وليست فارغة
+    final storePhone = widget.product.storePhone;
     final bool isPhoneAvailable = storePhone != null && storePhone.isNotEmpty;
 
     return Container(
       padding: const EdgeInsets.all(16),
       margin: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        // 💡 استخدام cardColor
+        color: cardColor,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2)),
+          BoxShadow(color: primaryColor.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2)),
         ],
       ),
       child: Column(
@@ -133,28 +146,26 @@ class _ProductDetailViewState extends State<ProductDetailView> {
         children: [
           Row(
             children: [
-              const Icon(Icons.storefront, size: 20, color: Colors.grey),
+              Icon(Icons.storefront, size: 20, color: secondaryColor), // 💡 استخدام secondaryColor
               const SizedBox(width: 10),
               Text(
                 widget.product.storeName,
-                style: _getTenorSansStyle(16),
+                style: _getTenorSansStyle(context, 16), // 💡 تمرير context
               ),
               const Spacer(),
             ],
           ),
           
-          // استخدام الشرط المصحح isPhoneAvailable
           if (isPhoneAvailable)
             Padding(
               padding: const EdgeInsets.only(top: 8.0),
               child: Row(
                 children: [
-                  const Icon(Icons.phone, size: 20, color: Colors.grey),
+                  Icon(Icons.phone, size: 20, color: secondaryColor), // 💡 استخدام secondaryColor
                   const SizedBox(width: 10),
                   Text(
-                    // استخدام storePhone! لضمان أن القيمة String غير قابلة للـ null (الشرط if يضمن ذلك)
                     storePhone!, 
-                    style: _getTenorSansStyle(16),
+                    style: _getTenorSansStyle(context, 16), // 💡 تمرير context
                   ),
                   const Spacer(),
                 ],
@@ -164,20 +175,54 @@ class _ProductDetailViewState extends State<ProductDetailView> {
       ),
     );
   }
+
+
+  void _showAddedToCartNotification(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.greenAccent, size: 24),
+            const SizedBox(width: 12),
+            Text(
+              "${widget.product.name} Added to Cart!",
+              style: _getTenorSansStyle(context, 16).copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+        // يمكنك استخدام لون داكن للخلفية ليتناسب مع أي ثيم
+        backgroundColor: Colors.black87, 
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating, // يجعلها عائمة وأنيقة
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10.0),
+        ),
+        margin: const EdgeInsets.only(bottom: 20, left: 10, right: 10),
+      ),
+    );
+  }
   
   Widget _buildStickyBottomBar(BuildContext context) {
     final cartManager = Provider.of<CartManager>(context, listen: false);
     
-    // ملاحظة: يُفترض أن widget.product.price هي double
+    // 💡 جلب الألوان الديناميكية
+    final Color primaryColor = Theme.of(context).colorScheme.primary; 
+    final Color secondaryColor = Theme.of(context).colorScheme.onSurface; 
+    final Color cardColor = Theme.of(context).cardColor;
+    
     final double totalPrice = widget.product.price * _quantity;
     final String totalPriceString = "\$${totalPrice.toStringAsFixed(2)}";
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Divider(height: 1, color: Colors.grey.shade300),
+        // 💡 استخدام secondaryColor للفاصل
+        Divider(height: 1, color: secondaryColor.withOpacity(0.3)),
         Container(
-          color: Colors.white,
+          // 💡 استخدام cardColor
+          color: cardColor,
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
@@ -187,11 +232,12 @@ class _ProductDetailViewState extends State<ProductDetailView> {
                 children: [
                   Text(
                     "Total Price",
-                    style: _getTenorSansStyle(14).copyWith(color: secondaryText),
+                    // 💡 استخدام secondaryColor
+                    style: _getTenorSansStyle(context, 14).copyWith(color: secondaryColor),
                   ),
                   Text(
                     totalPriceString,
-                    style: _getTenorSansStyle(20, weight: FontWeight.bold),
+                    style: _getTenorSansStyle(context, 20, weight: FontWeight.bold),
                   ),
                 ],
               ),
@@ -201,12 +247,13 @@ class _ProductDetailViewState extends State<ProductDetailView> {
               // Add to Cart Button
               ElevatedButton(
                 onPressed: () {
-                  // استخدام CartManager
                   cartManager.addToCart(product: widget.product, quantity: _quantity);
+                  _showAddedToCartNotification(context);
                   Navigator.of(context).pop(); 
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.black,
+                  // 💡 استخدام primaryColor كخلفية للزر (سيكون داكناً في الثيم الفاتح)
+                  backgroundColor: primaryColor,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -215,11 +262,14 @@ class _ProductDetailViewState extends State<ProductDetailView> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.shopping_cart, color: Colors.white),
+                    // 💡 استخدام لون يتناقض مع primaryColor (يجب أن يكون اللون المعكوس)
+                    Icon(Icons.shopping_cart, color: Theme.of(context).colorScheme.onPrimary),
                     const SizedBox(width: 8),
                     Text(
                       "Add to Cart",
-                      style: _getTenorSansStyle(16, weight: FontWeight.w600).copyWith(color: Colors.white),
+                      style: _getTenorSansStyle(context, 16, weight: FontWeight.w600)
+                              // 💡 استخدام لون يتناقض مع primaryColor
+                              .copyWith(color: Theme.of(context).colorScheme.onPrimary),
                     ),
                   ],
                 ),
@@ -231,58 +281,62 @@ class _ProductDetailViewState extends State<ProductDetailView> {
     );
   }
   
-  // 🚀 التعديل على دالة _startChat لتوحيد الـ chatID
+  // 🚀 دالة الدردشة (تبقى كما هي)
   void _startChat() {
-  final String? currentUserID = FirebaseAuth.instance.currentUser?.uid; 
-  if (currentUserID == null) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Please sign in to start a chat.')),
-    );
-    return;
-  }
-  
-  final ProductS chatProduct = ProductS.fromProduct(widget.product);
-  
-  // 💡 إنشاء الـ chatID الموحد: تجميع الـ IDs وترتيبها أبجدياً + إضافة ID المنتج
-  final String customerOrUID = currentUserID; // UID العميل
-  final String storeOwnerEmail = widget.product.storeOwnerEmail;
-  
-  // تجميع المعرّفات (الأطراف فقط)
-  final List<String> participants = [customerOrUID, storeOwnerEmail];
-  participants.sort(); // ترتيب أبجدي
+    final String? currentUserID = FirebaseAuth.instance.currentUser?.uid; 
+    if (currentUserID == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please sign in to start a chat.')),
+      );
+      return;
+    }
+    
+    final ProductS chatProduct = ProductS.fromProduct(widget.product);
+    
+    final String customerOrUID = currentUserID;
+    final String storeOwnerEmail = widget.product.storeOwnerEmail;
+    
+    final List<String> participants = [customerOrUID, storeOwnerEmail];
+    participants.sort();
 
-  // 🚀 التعديل الحاسم: إضافة product.id لضمان فرادة المحادثة
-  final String chatID = '${participants[0]}_${participants[1]}_${widget.product.id}';
+    final String chatID = '${participants[0]}_${participants[1]}_${widget.product.id}';
 
 
-  // فتح شاشة الدردشة
-  Navigator.of(context).push(
-    MaterialPageRoute(
-      builder: (context) => ChatView(
-        chatID: chatID, // استخدام الـ ID الموحد والفريد
-        product: chatProduct, 
-        currentUserID: currentUserID, 
-        isStoreOwner: false, 
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ChatView(
+          chatID: chatID,
+          product: chatProduct, 
+          currentUserID: currentUserID, 
+          isStoreOwner: false, 
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
 
   // MARK: - Main Build Method
   @override
   Widget build(BuildContext context) {
+    // 💡 جلب الألوان الأساسية هنا
+    final Color scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
+    final Color primaryColor = Theme.of(context).colorScheme.primary; 
+    final Color secondaryColor = Theme.of(context).colorScheme.onSurface; 
+    final Color greenColor = Colors.green.shade700; // اللون الأخضر للمنتج يبقى ثابتًا
+
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      // 💡 استخدام scaffoldColor
+      backgroundColor: scaffoldColor,
       appBar: AppBar(
-        title: const Text("Product Details"),
+        title: Text("Product Details", style: TextStyle(color: primaryColor)),
         centerTitle: true,
-        // منع ظهور زر الرجوع التلقائي
+        // 💡 استخدام لون خلفية AppBar الديناميكي
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
         automaticallyImplyLeading: false, 
         
         // تعيين زر المراسلة في أقصى اليسار (Leading)
         leading: IconButton( 
-            icon: Icon(Icons.message, color: primaryText),
+            icon: Icon(Icons.message, color: primaryColor), // 💡 استخدام primaryColor
             onPressed: _startChat,
         ),
         
@@ -290,7 +344,7 @@ class _ProductDetailViewState extends State<ProductDetailView> {
         actions: [
           // زر الإغلاق (xmark)
           IconButton(
-            icon: Icon(Icons.close, color: primaryText),
+            icon: Icon(Icons.close, color: primaryColor), // 💡 استخدام primaryColor
             onPressed: () => Navigator.of(context).pop(),
           ),
         ],
@@ -309,8 +363,8 @@ class _ProductDetailViewState extends State<ProductDetailView> {
                   child: CachedNetworkImage(
                     imageUrl: widget.product.imageUrl,
                     fit: BoxFit.cover,
-                    placeholder: (context, url) => Center(child: CircularProgressIndicator()),
-                    errorWidget: (context, url, error) => const Center(child: Icon(Icons.image_not_supported)),
+                    placeholder: (context, url) => Center(child: CircularProgressIndicator(color: secondaryColor)), // 💡 استخدام secondaryColor
+                    errorWidget: (context, url, error) => Center(child: Icon(Icons.image_not_supported, color: secondaryColor)), // 💡 استخدام secondaryColor
                   ),
                 ),
                 
@@ -324,12 +378,12 @@ class _ProductDetailViewState extends State<ProductDetailView> {
                         children: [
                           Text(
                             widget.product.name,
-                            style: _getTenorSansStyle(24),
+                            style: _getTenorSansStyle(context, 24), // 💡 تمرير context
                           ),
                           const SizedBox(height: 12),
                           Text(
                             "\$${widget.product.price.toStringAsFixed(2)}",
-                            style: _getTenorSansStyle(20, weight: FontWeight.bold).copyWith(color: greenColor),
+                            style: _getTenorSansStyle(context, 20, weight: FontWeight.bold).copyWith(color: greenColor),
                           ),
                         ],
                       ),
@@ -341,7 +395,7 @@ class _ProductDetailViewState extends State<ProductDetailView> {
                           thickness: 1, 
                           indent: MediaQuery.of(context).size.width * 0.3,
                           endIndent: MediaQuery.of(context).size.width * 0.3,
-                          color: Colors.grey.shade300,
+                          color: secondaryColor.withOpacity(0.3), // 💡 استخدام secondaryColor
                         ),
                       ),
                       
@@ -352,7 +406,8 @@ class _ProductDetailViewState extends State<ProductDetailView> {
                         padding: const EdgeInsets.symmetric(horizontal: 30),
                         child: Text(
                           widget.product.description,
-                          style: _getTenorSansStyle(16).copyWith(color: secondaryText),
+                          // 💡 استخدام secondaryColor
+                          style: _getTenorSansStyle(context, 16).copyWith(color: secondaryColor), 
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -360,12 +415,12 @@ class _ProductDetailViewState extends State<ProductDetailView> {
                       const SizedBox(height: 30),
                       
                       // Quantity Selector
-                      _buildQuantitySelector(),
+                      _buildQuantitySelector(context), // 💡 تمرير context
                       
                       const SizedBox(height: 20),
                       
                       // Store Info
-                      _buildStoreInfo(),
+                      _buildStoreInfo(context), // 💡 تمرير context
                       
                       // مساحة إضافية لتجنب تداخل شريط السلة الثابت
                       const SizedBox(height: 100), 
