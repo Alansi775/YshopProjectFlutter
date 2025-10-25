@@ -3,8 +3,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
-import 'package:provider/provider.dart'; // 💡 تم إضافة Provider
-import '../state_management/theme_manager.dart'; // 💡 تم إضافة ThemeManager
+import 'package:provider/provider.dart'; //  تم إضافة Provider
+import '../state_management/cart_manager.dart'; 
+import '../state_management/theme_manager.dart'; //  تم إضافة ThemeManager
 
 // المكونات المخصصة
 import '../widgets/custom_form_widgets.dart'; 
@@ -14,8 +15,10 @@ import 'store_admin_view.dart';
 import 'admin_login_view.dart' as Admin;
 import 'admin_home_view.dart'; 
 import '../widgets/welcoming_page_shimmer.dart'; 
+import 'delivery_signup_view.dart'; // استيراد شاشة تسجيل الموصل
+import 'delivery_home_view.dart'; // استيراد شاشة الموصل
 
-// ⚠️ ملاحظة هامة: يجب أن تكون الألوان (primaryText, accentBlue, secondaryText)
+//  ملاحظة هامة: يجب أن تكون الألوان (primaryText, accentBlue, secondaryText)
 // معرّفة كـ const في ملف custom_form_widgets.dart لتجنب الأخطاء.
 
 class SignInView extends StatefulWidget {
@@ -140,21 +143,70 @@ class _SignInViewState extends State<SignInView> {
       // تجاهل
     }
 
+    // 💡 3. فحص الموصل (Delivery Driver)
+    try {
+      final driverDoc = await FirebaseFirestore.instance.collection("deliveryRequests").doc(user.uid).get();
+      
+      if (driverDoc.exists) {
+        final data = driverDoc.data()!;
+        final status = data["status"] as String?;
+        final driverName = data["name"] as String? ?? 'Driver';
+
+        if (status == "Approved") {
+          // التوجيه إلى لوحة الموصل
+          if (mounted) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (context) => DeliveryHomeView(driverName: driverName)),
+            );
+          }
+          return;
+        } else if (status == "Pending") {
+          // حالة معلقة: لا يمكنه تسجيل الدخول. يتم إظهار رسالة وانتظار الإدارة
+          await FirebaseAuth.instance.signOut();
+          if (mounted) {
+            setState(() {
+                _message = "Your driver account request is still Pending admin approval.";
+            });
+          }
+          return;
+        }
+      }
+    } catch (e) {
+      // تجاهل
+    }
+
     // 3. توجيه العميل (في حال الفشل أو عدم العثور على دور)
     if (mounted) {
+      final userEmail = user.email;
+      if (userEmail != null) {
+        final query = await FirebaseFirestore.instance
+            .collection('orders')
+            .where('userEmail', isEqualTo: userEmail)
+            .where('status', isNotEqualTo: 'Delivered')
+            .orderBy('createdAt', descending: true)
+            .limit(1)
+            .get();
+
+        if (query.docs.isNotEmpty) {
+          final lastOrderId = query.docs.first.id;
+          Provider.of<CartManager>(context, listen: false).setLastOrderId(lastOrderId);
+        } else {
+          Provider.of<CartManager>(context, listen: false).setLastOrderId(null);
+        }
+      }
       Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const CategoryHomeView()),
       );
     }
   }
   
-  // 💡 تحديث: التحقق من حالة تسجيل الدخول الحالية (عند بدء التشغيل)
-  void _checkAuthState() async { // 💡 جعلها async
+  //  تحديث: التحقق من حالة تسجيل الدخول الحالية (عند بدء التشغيل)
+  void _checkAuthState() async { //  جعلها async
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      await user.reload(); // 💡 تحديث حالة المستخدم قبل الفحص
+      await user.reload(); //  تحديث حالة المستخدم قبل الفحص
       
-      // 💡 التحقق من التفعيل قبل التوجيه التلقائي
+      //  التحقق من التفعيل قبل التوجيه التلقائي
       if (!user.emailVerified) {
         await FirebaseAuth.instance.signOut();
         // سيبقى في شاشة تسجيل الدخول
@@ -210,7 +262,7 @@ class _SignInViewState extends State<SignInView> {
         });
       }
     }
-}
+ }
 
   void _signUpCustomer() async {
     if (_isLoading) return; 
@@ -238,14 +290,14 @@ class _SignInViewState extends State<SignInView> {
           });
         }
 
-        // 💡 إزالة التأخير المكرر
+        //  إزالة التأخير المكرر
         Future.delayed(const Duration(seconds: 3), () {
           if (mounted) {
             setState(() {
               _showSignUp = false;
               _emailController.clear();
               _passwordController.clear();
-              _isLoading = false; // 💡 إيقاف التحميل بعد التأخير
+              _isLoading = false; //  إيقاف التحميل بعد التأخير
             });
           }
         });
@@ -264,7 +316,7 @@ class _SignInViewState extends State<SignInView> {
           _message = "Failed to create user document: ${e.message}";
         });
       }
-    } finally { // 💡 ضمان إيقاف التحميل في حالة الفشل
+    } finally { //  ضمان إيقاف التحميل في حالة الفشل
       if (mounted && _isLoading) { 
         setState(() {
           _isLoading = false;
@@ -347,7 +399,7 @@ class _SignInViewState extends State<SignInView> {
           _message = "Error checking request: ${e.message}";
         });
       }
-    } finally { // 💡 ضمان إيقاف التحميل
+    } finally { //  ضمان إيقاف التحميل
       if (mounted) { 
         setState(() {
           _isLoading = false;
@@ -374,7 +426,6 @@ class _SignInViewState extends State<SignInView> {
       final user = userCredential.user;
       if (user == null) return;
 
-      // ... (كود إرسال الطلب لـ Firestore)
       
       await user.sendEmailVerification();
 
@@ -384,14 +435,14 @@ class _SignInViewState extends State<SignInView> {
         });
       }
 
-      // 💡 إزالة التأخير المكرر
+      //  إزالة التأخير المكرر
       Future.delayed(const Duration(seconds: 3), () {
         if (mounted) {
           setState(() {
             _isNewStoreOwner = false;
             _emailController.clear();
             _passwordController.clear();
-            _isLoading = false; // 💡 إيقاف التحميل بعد التأخير
+            _isLoading = false; //  إيقاف التحميل بعد التأخير
           });
         }
       });
@@ -408,7 +459,7 @@ class _SignInViewState extends State<SignInView> {
           _message = "Failed to send request: ${e.message}";
         });
       }
-    } finally { // 💡 ضمان إيقاف التحميل في حالة الفشل
+    } finally { //  ضمان إيقاف التحميل في حالة الفشل
       if (mounted && _isLoading) {
         setState(() {
           _isLoading = false;
@@ -421,7 +472,7 @@ class _SignInViewState extends State<SignInView> {
   // MARK: - Action Buttons 
 
   Widget _toggleOwnershipButton() {
-    // 💡 استخدام الألوان من الثيم
+    //  استخدام الألوان من الثيم
     return TextButton(
       onPressed: () {
         setState(() {
@@ -441,7 +492,7 @@ class _SignInViewState extends State<SignInView> {
   }
 
   Widget _toggleSignUpLoginButton() {
-    // 💡 استخدام الألوان من الثيم
+    //  استخدام الألوان من الثيم
     return TextButton(
       onPressed: () {
         setState(() {
@@ -460,7 +511,6 @@ class _SignInViewState extends State<SignInView> {
   }
 
   Widget _toggleNewStoreOwnerButton() {
-    // 💡 استخدام الألوان من الثيم
     return TextButton(
       onPressed: () {
         setState(() {
@@ -479,6 +529,33 @@ class _SignInViewState extends State<SignInView> {
     );
   }
 
+
+  // 💡 ودجت جديد: زر الانتقال لتسجيل الموصل
+  Widget _deliveryDriverSignupButton(BuildContext context) {
+    // نستخدم نفس تنسيق ولون زر المتجر ليتناسبا
+    return TextButton(
+      onPressed: () {
+        // الانتقال إلى شاشة تسجيل الموصل
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            fullscreenDialog: true,
+            builder: (context) => const DeliverySignupView(), // تأكد من استيرادها
+          ),
+        );
+      },
+      child: Text(
+        "Want to be a Delivery Driver? Sign Up",
+        style: TextStyle(
+          fontSize: 14,
+          // 🚀 تم تغيير اللون لاستخدام secondary Color ليتطابق مع زر المتجر
+          color: Theme.of(context).colorScheme.secondary, 
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+
   Widget _adminLoginButton(BuildContext context) {
     return ElevatedButton(
       onPressed: () {
@@ -490,7 +567,7 @@ class _SignInViewState extends State<SignInView> {
         );
       },
       style: ElevatedButton.styleFrom(
-        // 💡 استخدام ألوان ثابتة للمشرف (لأنه دور خاص)
+        //  استخدام ألوان ثابتة للمشرف (لأنه دور خاص)
         backgroundColor: Colors.black, 
         foregroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -505,7 +582,7 @@ class _SignInViewState extends State<SignInView> {
   }
 
   Widget _backButton({required VoidCallback action}) {
-    // 💡 استخدام الألوان من الثيم
+    //  استخدام الألوان من الثيم
     return TextButton(
       onPressed: () {
         action();
@@ -617,7 +694,6 @@ class _SignInViewState extends State<SignInView> {
   }
 
   Widget get _storeOwnerSection {
-    // 💡 الحصول على لون النص الرئيسي من الثيم
     final Color primaryColor = Theme.of(context).colorScheme.primary; 
 
     return Column(
@@ -628,7 +704,6 @@ class _SignInViewState extends State<SignInView> {
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w700,
-            // 💡 استخدام اللون من الثيم
             color: primaryColor, 
           ),
         ),
@@ -645,7 +720,11 @@ class _SignInViewState extends State<SignInView> {
           Column(
             children: [
               _loginStoreOwnerForm,
-              _toggleNewStoreOwnerButton(),
+              
+              // 🚀 التعديل هنا: دمج زر المتجر وزر الموصلين
+              _toggleNewStoreOwnerButton(), 
+              _deliveryDriverSignupButton(context), // 💡 زر الموصل الجديد هنا
+              
               const SizedBox(height: 15),
               _adminLoginButton(context),
               _backButton(action: () => setState(() => _isStoreOwner = false)),
@@ -659,20 +738,20 @@ class _SignInViewState extends State<SignInView> {
   // MARK: - Main Build Method (التصميم الجديد)
   @override
   Widget build(BuildContext context) {
-    // 💡 الحصول على ThemeManager وإعداد الألوان الديناميكية
+    //  الحصول على ThemeManager وإعداد الألوان الديناميكية
     final themeManager = Provider.of<ThemeManager>(context);
     final isDark = themeManager.isDarkMode;
     
-    // 💡 استخدام الألوان من الثيم بدلاً من الثابتة
+    //  استخدام الألوان من الثيم بدلاً من الثابتة
     final cardColor = Theme.of(context).cardColor;
     
     return Scaffold(
-      // 💡 إضافة AppBar مع زر تبديل المظهر
+      //  إضافة AppBar مع زر تبديل المظهر
       appBar: AppBar(
         elevation: 0,
         actions: [
           IconButton(
-            // 💡 عرض أيقونة الشمس إذا كان الوضع الداكن، وأيقونة القمر إذا كان الوضع الفاتح
+            //  عرض أيقونة الشمس إذا كان الوضع الداكن، وأيقونة القمر إذا كان الوضع الفاتح
             icon: Icon(isDark ? Icons.wb_sunny : Icons.nights_stay),
             onPressed: () {
               themeManager.switchTheme(); 
@@ -681,7 +760,7 @@ class _SignInViewState extends State<SignInView> {
         ],
       ),
       body: Container(
-        // 💡 إزالة التدرج واستخدام لون الخلفية من الثيم
+        //  إزالة التدرج واستخدام لون الخلفية من الثيم
         color: Theme.of(context).scaffoldBackgroundColor,
         child: Center(
           child: ConstrainedBox(
@@ -703,7 +782,7 @@ class _SignInViewState extends State<SignInView> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      // 💡 استخدام لون البطاقة من الثيم
+                      //  استخدام لون البطاقة من الثيم
                       color: cardColor, 
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 25.0, vertical: 35.0),
@@ -718,7 +797,7 @@ class _SignInViewState extends State<SignInView> {
                                 _message,
                                 textAlign: TextAlign.center,
                                 style: const TextStyle(
-                                  // 💡 اللون الأحمر ثابت لرسالة الخطأ
+                                  //  اللون الأحمر ثابت لرسالة الخطأ
                                   color: Colors.red, 
                                   fontSize: 12,
                                 ),

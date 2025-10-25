@@ -10,7 +10,7 @@ class CheckoutItemWidget extends StatelessWidget {
 
   const CheckoutItemWidget({Key? key, required this.item}) : super(key: key);
 
-  // 💡 تم تعديل الدالة لتقبل context وتستخدم primaryColor افتراضيًا
+  //  تم تعديل الدالة لتقبل context وتستخدم primaryColor افتراضيًا
   TextStyle _getTenorSansStyle(BuildContext context, double size, {FontWeight weight = FontWeight.normal, Color? color}) {
     final Color primaryColor = Theme.of(context).colorScheme.primary; 
     return TextStyle(
@@ -23,7 +23,7 @@ class CheckoutItemWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 💡 جلب الألوان الديناميكية
+    //  جلب الألوان الديناميكية
     final Color secondaryColor = Theme.of(context).colorScheme.onSurface;
     
     // تنسيق السعر لعرضه بشكل فردي
@@ -43,11 +43,11 @@ class CheckoutItemWidget extends StatelessWidget {
               width: 60,
               height: 60,
               placeholder: (context, url) => Container(
-                width: 60, height: 60, color: secondaryColor.withOpacity(0.1), // 💡 لون ديناميكي
+                width: 60, height: 60, color: secondaryColor.withOpacity(0.1), //  لون ديناميكي
               ),
               errorWidget: (context, url, error) => Container(
                 width: 60, height: 60, color: secondaryColor.withOpacity(0.1), 
-                child: Icon(Icons.error, color: secondaryColor), // 💡 لون ديناميكي
+                child: Icon(Icons.error, color: secondaryColor), //  لون ديناميكي
               ),
             ),
           ),
@@ -61,7 +61,7 @@ class CheckoutItemWidget extends StatelessWidget {
               children: [
                 Text(
                   item.product.name,
-                  style: _getTenorSansStyle(context, 16), // 💡 تمرير context
+                  style: _getTenorSansStyle(context, 16), //  تمرير context
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -69,7 +69,7 @@ class CheckoutItemWidget extends StatelessWidget {
                 // (item.count) × (item.product.price)
                 Text(
                   "${item.quantity} × $priceFormatted",
-                  // 💡 استخدام secondaryColor
+                  //  استخدام secondaryColor
                   style: _getTenorSansStyle(context, 14).copyWith(color: secondaryColor.withOpacity(0.7)),
                 ),
               ],

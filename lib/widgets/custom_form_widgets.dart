@@ -26,7 +26,7 @@ class UnderlinedTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 💡 1. استخراج الألوان من الثيم
+    //  1. استخراج الألوان من الثيم
     // primaryColor: للخط الأساسي والكتابة (أسود في الفاتح، أبيض في الداكن)
     final Color primaryColor = Theme.of(context).colorScheme.primary; 
     // secondaryColor: للنصوص الثانوية (مثل الـ placeholder)
@@ -34,7 +34,7 @@ class UnderlinedTextField extends StatelessWidget {
     // dividerColor: لون الخط الفاصل
     final Color dividerColor = Theme.of(context).dividerColor; 
 
-    // 💡 2. TextSelectionThemeData: المؤشر والتضليل
+    //  2. TextSelectionThemeData: المؤشر والتضليل
     return TextSelectionTheme(
       data: TextSelectionThemeData(
         // استخدام اللون الأساسي للثيم
@@ -48,9 +48,9 @@ class UnderlinedTextField extends StatelessWidget {
           // Placeholder as a label above the field
           Text(
             placeholder,
-            style: TextStyle( // ⚠️ إزالة const
+            style: TextStyle( //  إزالة const
               fontSize: 12,
-              // 💡 استخدام اللون الثانوي الديناميكي
+              //  استخدام اللون الثانوي الديناميكي
               color: secondaryColor,
             ),
           ),
@@ -60,7 +60,7 @@ class UnderlinedTextField extends StatelessWidget {
             controller: controller,
             obscureText: isPassword,
             keyboardType: keyboardType,
-            // 💡 التعديل الحاسم: تعيين لون الكتابة (style) ليعتمد على الثيم
+            //  التعديل الحاسم: تعيين لون الكتابة (style) ليعتمد على الثيم
             style: TextStyle(
               color: primaryColor, // سيصبح أبيض في الوضع الداكن
               fontSize: 16,
@@ -76,11 +76,11 @@ class UnderlinedTextField extends StatelessWidget {
               border: InputBorder.none, // إزالة الحدود الافتراضية
             ),
           ),
-          Padding( // ⚠️ إزالة const
+          Padding( //  إزالة const
             padding: const EdgeInsets.only(top: 8.0),
             child: Divider(
               height: 1,
-              // 💡 استخدام لون الفاصل الديناميكي
+              //  استخدام لون الفاصل الديناميكي
               color: dividerColor,
             ),
           ),
@@ -131,7 +131,7 @@ class PrimaryActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 💡 الحصول على لون التمييز من الثيم (يفترض أنه accentBlue أو ما شابه)
+    //  الحصول على لون التمييز من الثيم (يفترض أنه accentBlue أو ما شابه)
     final Color accentColor = Theme.of(context).colorScheme.secondary; 
     
     return Padding(
@@ -139,7 +139,7 @@ class PrimaryActionButton extends StatelessWidget {
       child: ElevatedButton(
         onPressed: isLoading ? null : action,
         style: ElevatedButton.styleFrom(
-          // 💡 استخدام لون التمييز الديناميكي
+          //  استخدام لون التمييز الديناميكي
           backgroundColor: accentColor, 
           foregroundColor: Colors.white, // النص يبقى أبيض لتحقيق التباين
           shape: RoundedRectangleBorder(
@@ -147,7 +147,7 @@ class PrimaryActionButton extends StatelessWidget {
           ),
           minimumSize: const Size(double.infinity, 50), 
           padding: const EdgeInsets.symmetric(vertical: 15),
-          // 💡 استخدام لون التمييز في الظل
+          //  استخدام لون التمييز في الظل
           shadowColor: accentColor.withOpacity(0.3), 
           elevation: 8,
         ),
@@ -159,7 +159,7 @@ class PrimaryActionButton extends StatelessWidget {
                   color: Colors.white,
                 ),
               )
-            : Text( // ⚠️ أضفنا const مرة أخرى هنا إذا كان النص ثابتاً
+            : Text( //  أضفنا const مرة أخرى هنا إذا كان النص ثابتاً
                 title,
                 style: TextStyle(
                   fontSize: 16, 

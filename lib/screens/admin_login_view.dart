@@ -212,13 +212,13 @@ class _AdminLoginViewState extends State<AdminLoginView> {
 
     return Scaffold(
       //  إضافة AppBar بسيط لزر الرجوع (السهم)
-appBar: AppBar(
-  backgroundColor: kDarkBackground, 
-  foregroundColor: kPrimaryTextColor, 
-  elevation: 0, 
-  automaticallyImplyLeading: true, 
-  iconTheme: const IconThemeData(color: Colors.white), // أضف هذا السطر
-),
+      appBar: AppBar(
+        backgroundColor: kDarkBackground, 
+        foregroundColor: kPrimaryTextColor, 
+        elevation: 0, 
+        automaticallyImplyLeading: true, 
+        iconTheme: const IconThemeData(color: Colors.white), // أضف هذا السطر
+      ),
       //  خلفية الشاشة سوداء أنيقة
       backgroundColor: kDarkBackground,
       //  إزالة الـ AppBar القياسي
@@ -255,7 +255,7 @@ appBar: AppBar(
                          //  العنوان التوجيهي داخل البطاقة
                         const Text(
                           "YShop Employee Login", 
-                          textAlign: TextAlign.left, // تعديل النص ليكون على اليسار ليتناسب مع تصميم البطاقة
+                          textAlign: TextAlign.center, // تعديل النص ليكون على اليسار ليتناسب مع تصميم البطاقة
                           style: TextStyle(
                             fontSize: 24, // زيادة الحجم ليكون بارزًا
                             fontWeight: FontWeight.normal,

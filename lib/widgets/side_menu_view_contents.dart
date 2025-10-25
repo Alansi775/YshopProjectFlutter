@@ -299,9 +299,18 @@ class _SideMenuViewContentsState extends State<SideMenuViewContents> {
               icon: Icons.settings,
               text: "Settings",
               onTap: () {
-                Navigator.of(context).pop(); 
+                Navigator.of(context).pop();
                 Navigator.of(context).push(
-                    MaterialPageRoute(builder: (context) => const SettingsView())
+                  PageRouteBuilder(
+                    pageBuilder: (context, animation, secondaryAnimation) => const SettingsView(),
+                    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                      return FadeTransition(
+                        opacity: animation.drive(Tween(begin: 0.0, end: 1.0)),
+                        child: child,
+                      );
+                    },
+                    transitionDuration: const Duration(milliseconds: 250), // سرعة الانتقال
+                  ),
                 );
               },
             ),

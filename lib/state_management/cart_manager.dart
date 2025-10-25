@@ -2,17 +2,17 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// ⭐️ تأكد من وجود ملفات الـ Models هذه في مسارها الصحيح (models/)
+//  تأكد من وجود ملفات الـ Models هذه في مسارها الصحيح (models/)
 import '../models/product.dart'; 
 import '../models/cart_item_model.dart'; 
 
 class CartManager with ChangeNotifier {
-  // ⭐️ الآن تم تعريف الأنواع بشكل صحيح
+  //  الآن تم تعريف الأنواع بشكل صحيح
   List<CartItemModel> _items = []; 
   final String _storageKey = 'savedCartItems';
   bool _initialized = false;
   
-  // 💡 متغيرات تخزين حالة الطلب
+  //  متغيرات تخزين حالة الطلب
   String? _lastOrderId; 
   static const String _orderIdKey = 'last_active_order_id';
   bool _orderIdLoaded = false;
@@ -20,13 +20,13 @@ class CartManager with ChangeNotifier {
   String? get lastOrderId => _lastOrderId;
   bool get orderIdLoaded => _orderIdLoaded;
 
-  // 💡 التعديل هنا: استدعاء دوال التحميل في الـ Constructor
+  //  التعديل هنا: استدعاء دوال التحميل في الـ Constructor
   CartManager() {
     _loadCart();
     _loadLastOrderId(); // يبدأ بتحميل رقم الطلب فور إنشاء الكائن
   }
 
-  // ⭐️ دالة تحميل رقم الطلب من التخزين الدائم
+  //  دالة تحميل رقم الطلب من التخزين الدائم
   Future<void> _loadLastOrderId() async {
     final prefs = await SharedPreferences.getInstance();
     _lastOrderId = prefs.getString(_orderIdKey);
@@ -34,7 +34,7 @@ class CartManager with ChangeNotifier {
     notifyListeners(); 
   }
   
-  // ⭐️ دالة تعيين وحفظ رقم الطلب في التخزين الدائم
+  //  دالة تعيين وحفظ رقم الطلب في التخزين الدائم
   void setLastOrderId(String? id) async {
     _lastOrderId = id;
     final prefs = await SharedPreferences.getInstance();
@@ -54,12 +54,12 @@ class CartManager with ChangeNotifier {
   List<CartItemModel> get items => _items;
   
   double get totalAmount {
-    // ⭐️ الآن product و quantity معرفتان
+    //  الآن product و quantity معرفتان
     return _items.fold(0.0, (sum, item) => sum + (item.product.price * item.quantity));
   }
   
   int get totalItems {
-    // ⭐️ الآن quantity معرفة
+    //  الآن quantity معرفة
     return _items.fold(0, (sum, item) => sum + item.quantity);
   }
   // -----------------------
@@ -73,7 +73,7 @@ class CartManager with ChangeNotifier {
     if (cartData != null) {
       final List<dynamic> decodedData = json.decode(cartData);
       _items = decodedData
-          // ⭐️ CartItemModel الآن معرفة
+          //  CartItemModel الآن معرفة
           .map((itemJson) => CartItemModel.fromJson(itemJson as Map<String, dynamic>)) 
           .toList();
     }
@@ -85,7 +85,7 @@ class CartManager with ChangeNotifier {
     if (!_initialized) return; 
     final prefs = await SharedPreferences.getInstance();
     
-    // ⭐️ تم تصحيح نوع الإخراج
+    //  تم تصحيح نوع الإخراج
     final List<Map<String, dynamic>> itemsJson = 
         _items.map((item) => item.toJson()).toList();
     
@@ -95,7 +95,7 @@ class CartManager with ChangeNotifier {
 
   // MARK: - Cart Operations 
   
-  // ⭐️ Product الآن معرفة
+  //  Product الآن معرفة
   void addToCart({required Product product, required int quantity}) { 
     final existingIndex = _items.indexWhere((item) => item.product.id == product.id);
 
@@ -106,7 +106,7 @@ class CartManager with ChangeNotifier {
         _items.removeAt(existingIndex);
       }
     } else if (quantity > 0) {
-      // ⭐️ CartItemModel الآن معرفة
+      //  CartItemModel الآن معرفة
       _items.add(CartItemModel(product: product, quantity: quantity)); 
     }
     
@@ -114,7 +114,7 @@ class CartManager with ChangeNotifier {
     notifyListeners();
   }
   
-  // ⭐️ Product الآن معرفة
+  //  Product الآن معرفة
   void removeFromCart(Product product) { 
     _items.removeWhere((item) => item.product.id == product.id);
     _saveCart(); 

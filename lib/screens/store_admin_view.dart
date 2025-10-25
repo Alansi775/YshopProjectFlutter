@@ -1,10 +1,12 @@
+// lib/screens/store_admin_view.dart
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 // استيراد جميع الشاشات الجديدة
 import '../screens/sign_in_view.dart'; 
 import '../screens/add_product_view.dart';
-import '../screens/orders_view.dart';
+import '../screens/orders_view.dart'; // 💡 تم استيرادها
 import '../screens/chat_list_view.dart';
 import '../screens/store_settings_view.dart';
 import '../screens/product_details_view.dart';
@@ -106,7 +108,7 @@ class _StoreAdminViewState extends State<StoreAdminView> {
     }
   }
 
-  // MARK: - Navigation Methods (تمت الإضافة)
+  // MARK: - Navigation Methods (التصحيح هنا)
 
   void _onAddProduct() {
     Navigator.of(context).push(MaterialPageRoute(
@@ -114,10 +116,20 @@ class _StoreAdminViewState extends State<StoreAdminView> {
     ));
   }
 
+  // ⭐️⭐️ التصحيح: جلب البريد الإلكتروني وتمريره إلى OrdersView ⭐️⭐️
   void _onOrders() {
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (context) => const OrdersView(),
-    ));
+    final storeEmail = FirebaseAuth.instance.currentUser?.email;
+
+    if (storeEmail != null) {
+      Navigator.of(context).push(MaterialPageRoute(
+        // 💡 تمرير المعامل المطلوب
+        builder: (context) => OrdersView(storeEmail: storeEmail),
+      ));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Error: Store owner email not found."))
+      );
+    }
   }
 
   void _onMessages() {
@@ -190,7 +202,7 @@ class _StoreAdminViewState extends State<StoreAdminView> {
                       QuickActionGrid(
                         //  ربط الإجراءات بأحدث الدوال
                         onAddProduct: _onAddProduct,
-                        onOrders: _onOrders,
+                        onOrders: _onOrders, // 💡 تم تحديث دالة _onOrders
                         onMessages: _onMessages,
                         // الإجراءات الأخرى في QuickActionGrid لم يتم تحديد توجيه لها في Swift، سنتركها مؤقتًا كما هي
                         onAnalytics: () { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Analytics View"))); },

@@ -136,7 +136,7 @@ class _StoreProductsViewState extends State<StoreProductsView> {
 
           return Column(
             children: [
-              // 💡 شريط البحث
+              //  شريط البحث
               Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: TextField(
@@ -161,7 +161,7 @@ class _StoreProductsViewState extends State<StoreProductsView> {
                 ),
               ),
 
-              // 💡 قائمة المنتجات (StreamBuilder)
+              //  قائمة المنتجات (StreamBuilder)
               Expanded(
                 child: RefreshIndicator(
                   onRefresh: () async => _refreshData(),
@@ -181,13 +181,13 @@ class _StoreProductsViewState extends State<StoreProductsView> {
 
                       final allProducts = snapshot.data?.docs.map(ProductSS.fromFirestore).toList() ?? [];
                       
-                      // 💡 تطبيق فلتر البحث
+                      //  تطبيق فلتر البحث
                       final filteredProducts = allProducts.where((product) {
                         return product.name.toLowerCase().contains(_searchQuery);
                       }).toList();
 
                       if (filteredProducts.isEmpty && allProducts.isNotEmpty) {
-                        // 💡 إصلاح خطأ السلسلة النصية: استخدام ${} لمتغير _searchQuery
+                        //  إصلاح خطأ السلسلة النصية: استخدام ${} لمتغير _searchQuery
                         return Center(child: Text("No products found matching '${_searchQuery}'", style: const
                         TextStyle(color: kSecondaryTextColor)));
                       }
@@ -322,7 +322,7 @@ class _ProductCardView extends StatelessWidget {
                     style: const TextStyle(fontSize: 12, color: kSecondaryTextColor),
                   ),
                   const SizedBox(height: 8),
-                  _StatusBadgeView(status: product.status),
+                  StatusBadgeView(status: product.status),
                 ],
               ),
             ),
@@ -353,10 +353,10 @@ class _ProductCardView extends StatelessWidget {
   }
 }
 
-class _StatusBadgeView extends StatelessWidget {
+class StatusBadgeView extends StatelessWidget {
   final String status;
 
-  const _StatusBadgeView({super.key, required this.status});
+  const StatusBadgeView({super.key, required this.status});
 
   @override
   Widget build(BuildContext context) {
@@ -544,7 +544,7 @@ class _ProductDetailView extends StatelessWidget {
   final ProductSS product;
   final VoidCallback onApprove;
   final VoidCallback onReject;
-  final VoidCallback onPending; // 💡 لإرجاع المنتج إلى Pending
+  final VoidCallback onPending; //  لإرجاع المنتج إلى Pending
   final VoidCallback onDismiss;
 
   const _ProductDetailView({
@@ -637,7 +637,7 @@ class _ProductDetailView extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       Expanded(
-                        // 💡 استخدام _ActionTextButton (Accept)
+                        //  استخدام _ActionTextButton (Accept)
                         child: _ActionTextButton(
                           label: "Accept",
                           color: Colors.green,
@@ -649,7 +649,7 @@ class _ProductDetailView extends StatelessWidget {
                       ),
                       const SizedBox(width: 16),
                       Expanded(
-                        // 💡 استخدام _ActionTextButton (Pending)
+                        //  استخدام _ActionTextButton (Pending)
                         child: _ActionTextButton(
                           label: "Pending",
                           color: Colors.orange,
@@ -661,7 +661,7 @@ class _ProductDetailView extends StatelessWidget {
                       ),
                        const SizedBox(width: 16),
                       Expanded(
-                        // 💡 استخدام _ActionTextButton (Delete)
+                        //  استخدام _ActionTextButton (Delete)
                         child: _ActionTextButton(
                           label: "Delete",
                           color: Colors.red,

@@ -33,7 +33,7 @@ class ChatModel {
     required this.customerID,
   });
 
-  // 💡 تحويل من Firestore
+  //  تحويل من Firestore
   factory ChatModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     return ChatModel(
@@ -60,7 +60,7 @@ class ChatListView extends StatelessWidget {
   
   const ChatListView({super.key, required this.storeOwnerID});
   
-  // 💡 دالة مساعدة لخط "TenorSans" (معدلة لاستقبال context)
+  //  دالة مساعدة لخط "TenorSans" (معدلة لاستقبال context)
   TextStyle _getTenorSansStyle(BuildContext context, double size, {FontWeight weight = FontWeight.normal, Color? color}) {
     final Color primaryColor = Theme.of(context).colorScheme.primary; 
     return TextStyle(
@@ -74,7 +74,7 @@ class ChatListView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 💡 جلب الألوان الديناميكية
+    //  جلب الألوان الديناميكية
     final Color primaryColor = Theme.of(context).colorScheme.primary;
     final Color secondaryColor = Theme.of(context).colorScheme.onSurface;
     
@@ -84,7 +84,7 @@ class ChatListView extends StatelessWidget {
       appBar: AppBar(
         title: Text("Customer Messages", style: _getTenorSansStyle(context, 20)),
         centerTitle: true,
-        // 💡 استخدام الألوان الديناميكية من الثيم
+        //  استخدام الألوان الديناميكية من الثيم
         backgroundColor: Theme.of(context).appBarTheme.backgroundColor, 
         foregroundColor: primaryColor, 
         elevation: 1,
@@ -101,7 +101,7 @@ class ChatListView extends StatelessWidget {
             
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                // 💡 استخدام لون يتناسب مع الثيم
+                //  استخدام لون يتناسب مع الثيم
                 return Center(child: CircularProgressIndicator(color: primaryColor));
               }
 
@@ -110,12 +110,12 @@ class ChatListView extends StatelessWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // 💡 استخدام secondaryColor بأقل شفافية
+                      //  استخدام secondaryColor بأقل شفافية
                       Icon(Icons.message, size: 50, color: secondaryColor.withOpacity(0.2)), 
                       const SizedBox(height: 10),
                       Text(
                         "No customer messages yet.",
-                        // 💡 استخدام secondaryColor
+                        //  استخدام secondaryColor
                         style: _getTenorSansStyle(context, 16).copyWith(color: secondaryColor.withOpacity(0.7)),
                       ),
                     ],
@@ -127,7 +127,7 @@ class ChatListView extends StatelessWidget {
 
               return ListView.separated(
                 itemCount: chats.length,
-                // 💡 استخدام Divider يتكيف مع الثيم
+                //  استخدام Divider يتكيف مع الثيم
                 separatorBuilder: (context, index) => Divider(height: 1, indent: 80, endIndent: 16, color: Theme.of(context).dividerColor),
                 itemBuilder: (context, index) {
                   final chat = chats[index];
@@ -182,7 +182,7 @@ class ChatCard extends StatelessWidget {
     required this.onTap,
   });
   
-  // 💡 دالة مساعدة لخط "TenorSans"
+  //  دالة مساعدة لخط "TenorSans"
   TextStyle _getTenorSansStyle(BuildContext context, double size, {FontWeight weight = FontWeight.normal, Color? color}) {
     final Color primaryColor = Theme.of(context).colorScheme.primary; 
     return TextStyle(
@@ -210,7 +210,7 @@ class ChatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 💡 جلب الألوان الديناميكية
+    //  جلب الألوان الديناميكية
     final Color secondaryColor = Theme.of(context).colorScheme.onSurface;
     
     final formattedTime = _formatTime(chat.lastMessageTime.toDate());
@@ -228,15 +228,15 @@ class ChatCard extends StatelessWidget {
           fit: BoxFit.cover,
           placeholder: (context, url) => Container(
             width: 50, height: 50, 
-            // 💡 لون ديناميكي خفيف
+            //  لون ديناميكي خفيف
             color: secondaryColor.withOpacity(0.1), 
             child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: secondaryColor.withOpacity(0.5)))),
           ),
           errorWidget: (context, url, error) => Container(
             width: 50, height: 50, 
-            // 💡 لون ديناميكي خفيف
+            //  لون ديناميكي خفيف
             color: secondaryColor.withOpacity(0.1), 
-            // 💡 استخدام secondaryColor للأيقونة
+            //  استخدام secondaryColor للأيقونة
             child: Icon(Icons.shopping_bag, size: 24, color: secondaryColor.withOpacity(0.5)),
           ),
         ),
@@ -244,14 +244,14 @@ class ChatCard extends StatelessWidget {
       
       title: Text(
         chat.productName,
-        // 💡 استخدام primaryColor للعنوان
+        //  استخدام primaryColor للعنوان
         style: _getTenorSansStyle(context, 16, weight: FontWeight.bold),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
       subtitle: Text(
         chat.lastMessage,
-        // 💡 استخدام secondaryColor للرسالة
+        //  استخدام secondaryColor للرسالة
         style: _getTenorSansStyle(context, 14).copyWith(color: secondaryColor.withOpacity(0.7)),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
@@ -263,7 +263,7 @@ class ChatCard extends StatelessWidget {
         children: [
           Text(
             formattedTime,
-            // 💡 استخدام secondaryColor للوقت
+            //  استخدام secondaryColor للوقت
             style: _getTenorSansStyle(context, 12, weight: FontWeight.w500).copyWith(color: secondaryColor.withOpacity(0.5)),
           ),
         ],

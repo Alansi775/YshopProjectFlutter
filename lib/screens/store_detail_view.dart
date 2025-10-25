@@ -8,7 +8,7 @@ import '../state_management/cart_manager.dart';
 import '../models/store.dart';
 import '../models/product.dart';
 import '../widgets/product_card.dart';
-// ⚠️ تم حذف استيراد custom_form_widgets.dart لأنه غير مستخدم
+//  تم حذف استيراد custom_form_widgets.dart لأنه غير مستخدم
 // import '../widgets/custom_form_widgets.dart'; // للألوان
 import '../widgets/side_cart_view_contents.dart'; 
 
@@ -36,7 +36,7 @@ class _StoreDetailViewState extends State<StoreDetailView> {
   
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  // ⚠️ تم حذف تعريفات الألوان الثابتة هنا:
+  //  تم حذف تعريفات الألوان الثابتة هنا:
   // final Color primaryText = Colors.black;
   // final Color secondaryText = Colors.grey;
   // final Color accentBlue = Colors.blue;
@@ -79,7 +79,7 @@ class _StoreDetailViewState extends State<StoreDetailView> {
 
   // مكافئ لـ StoreHeaderSection()
   Widget _buildStoreHeaderSection(BuildContext context) {
-    // 💡 جلب الألوان الديناميكية
+    //  جلب الألوان الديناميكية
     final Color primaryColor = Theme.of(context).colorScheme.primary; 
     final Color secondaryColor = Theme.of(context).colorScheme.onSurface;
 
@@ -93,7 +93,7 @@ class _StoreDetailViewState extends State<StoreDetailView> {
             height: 120,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              // 💡 استخدام لون يتغير مع الثيم (مثلاً: لون البطاقة مع تقليل الشفافية)
+              //  استخدام لون يتغير مع الثيم (مثلاً: لون البطاقة مع تقليل الشفافية)
               color: Theme.of(context).cardColor.withOpacity(0.8),
               boxShadow: [
                 BoxShadow(color: primaryColor.withOpacity(0.1), blurRadius: 8),
@@ -105,10 +105,10 @@ class _StoreDetailViewState extends State<StoreDetailView> {
                 fit: BoxFit.cover,
                 placeholder: (context, url) => Center(child: CircularProgressIndicator(
                   strokeWidth: 2, 
-                  color: secondaryColor.withOpacity(0.6), // 💡 استخدام لون ثانوي
+                  color: secondaryColor.withOpacity(0.6), //  استخدام لون ثانوي
                 )),
                 errorWidget: (context, url, error) => Center(
-                  child: Icon(Icons.storefront, size: 60, color: secondaryColor.withOpacity(0.6)), // 💡 استخدام لون ثانوي
+                  child: Icon(Icons.storefront, size: 60, color: secondaryColor.withOpacity(0.6)), //  استخدام لون ثانوي
                 ),
               ),
             ),
@@ -119,10 +119,10 @@ class _StoreDetailViewState extends State<StoreDetailView> {
           // Store Info
           Text(
             widget.store.storeName,
-            style: TextStyle( // ⚠️ إزالة const
+            style: TextStyle( //  إزالة const
               fontSize: 24, 
               fontWeight: FontWeight.bold,
-              color: primaryColor, // 💡 استخدام primaryColor
+              color: primaryColor, //  استخدام primaryColor
             ),
           ),
           const SizedBox(height: 12),
@@ -134,12 +134,12 @@ class _StoreDetailViewState extends State<StoreDetailView> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.location_on, size: 18, color: secondaryColor), // 💡 استخدام secondaryColor
+                  Icon(Icons.location_on, size: 18, color: secondaryColor), //  استخدام secondaryColor
                   const SizedBox(width: 8),
                   Flexible(
                     child: Text(
                       widget.store.address!,
-                      style: TextStyle(fontSize: 15, color: secondaryColor), // 💡 استخدام secondaryColor
+                      style: TextStyle(fontSize: 15, color: secondaryColor), //  استخدام secondaryColor
                       textAlign: TextAlign.center,
                     ),
                   ),
@@ -153,11 +153,11 @@ class _StoreDetailViewState extends State<StoreDetailView> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.phone, size: 18, color: secondaryColor), // 💡 استخدام secondaryColor
+                Icon(Icons.phone, size: 18, color: secondaryColor), //  استخدام secondaryColor
                 const SizedBox(width: 8),
                 Text(
                   widget.store.storePhoneNumber!,
-                  style: TextStyle(fontSize: 15, color: secondaryColor), // 💡 استخدام secondaryColor
+                  style: TextStyle(fontSize: 15, color: secondaryColor), //  استخدام secondaryColor
                 ),
               ],
             ),
@@ -169,7 +169,7 @@ class _StoreDetailViewState extends State<StoreDetailView> {
   // مكافئ لـ ProductsGridSection()
   Widget _buildProductsGridSection() {
     if (_products.isEmpty && !_isLoading) {
-      return _buildEmptyStateView(context); // 💡 تمرير context
+      return _buildEmptyStateView(context); //  تمرير context
     }
     
     return Padding(
@@ -199,7 +199,7 @@ class _StoreDetailViewState extends State<StoreDetailView> {
 
   // مكافئ لـ EmptyStateView()
   Widget _buildEmptyStateView(BuildContext context) {
-    // 💡 جلب الألوان الديناميكية
+    //  جلب الألوان الديناميكية
     final Color primaryColor = Theme.of(context).colorScheme.primary; 
     final Color secondaryColor = Theme.of(context).colorScheme.onSurface;
 
@@ -212,23 +212,23 @@ class _StoreDetailViewState extends State<StoreDetailView> {
             Icon(
               Icons.inventory_2_outlined,
               size: 60,
-              color: secondaryColor.withOpacity(0.5), // 💡 استخدام secondaryColor
+              color: secondaryColor.withOpacity(0.5), //  استخدام secondaryColor
             ),
             const SizedBox(height: 20),
             Text(
               "No Products Available",
-              style: TextStyle( // ⚠️ إزالة const
+              style: TextStyle( //  إزالة const
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: primaryColor, // 💡 استخدام primaryColor
+                color: primaryColor, //  استخدام primaryColor
               ),
             ),
             const SizedBox(height: 5),
             Text(
               "This store hasn't added any products yet.",
-              style: TextStyle( // ⚠️ إزالة const
+              style: TextStyle( //  إزالة const
                 fontSize: 14,
-                color: secondaryColor, // 💡 استخدام secondaryColor
+                color: secondaryColor, //  استخدام secondaryColor
               ),
               textAlign: TextAlign.center,
             ),
@@ -240,7 +240,7 @@ class _StoreDetailViewState extends State<StoreDetailView> {
   
   // مكافئ لـ ErrorMessageView
   Widget _buildErrorMessageView(BuildContext context) {
-    // 💡 جلب الألوان الديناميكية
+    //  جلب الألوان الديناميكية
     final Color cardColor = Theme.of(context).cardColor;
     
     return Center(
@@ -249,7 +249,7 @@ class _StoreDetailViewState extends State<StoreDetailView> {
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: cardColor, // 💡 استخدام لون البطاقة
+            color: cardColor, //  استخدام لون البطاقة
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: Colors.red.shade300)
           ),
@@ -271,7 +271,7 @@ class _StoreDetailViewState extends State<StoreDetailView> {
       builder: (context) => Container(
         height: MediaQuery.of(context).size.height * 0.95,
         decoration: BoxDecoration(
-          // 💡 استخدام لون الخلفية الديناميكي
+          //  استخدام لون الخلفية الديناميكي
           color: Theme.of(context).scaffoldBackgroundColor, 
           borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
@@ -297,7 +297,7 @@ class _StoreDetailViewState extends State<StoreDetailView> {
   
   // مكافئ لـ LoadingIndicator()
   Widget _buildLoadingIndicator(BuildContext context) {
-    // 💡 جلب الألوان الديناميكية
+    //  جلب الألوان الديناميكية
     final Color accentColor = Theme.of(context).colorScheme.secondary;
     final Color cardColor = Theme.of(context).cardColor;
     
@@ -305,12 +305,12 @@ class _StoreDetailViewState extends State<StoreDetailView> {
       child: Container(
         padding: const EdgeInsets.all(25),
         decoration: BoxDecoration(
-          // 💡 استخدام لون البطاقة بشفافية
+          //  استخدام لون البطاقة بشفافية
           color: cardColor.withOpacity(0.9),
           borderRadius: BorderRadius.circular(16),
         ),
         child: CircularProgressIndicator(
-          color: accentColor, // 💡 استخدام accentColor
+          color: accentColor, //  استخدام accentColor
           strokeWidth: 3,
         ),
       ),
@@ -320,25 +320,25 @@ class _StoreDetailViewState extends State<StoreDetailView> {
   // MARK: - Main Build Method
  @override
 Widget build(BuildContext context) {
-  // 💡 جلب الألوان الأساسية هنا
+  //  جلب الألوان الأساسية هنا
   final Color primaryColor = Theme.of(context).colorScheme.primary;
   final Color scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
   
   return Scaffold(
     key: _scaffoldKey,
-    // 💡 استخدام لون الخلفية الديناميكي
+    //  استخدام لون الخلفية الديناميكي
     backgroundColor: scaffoldColor,
     // نستخدم AppBar عادي هنا مع زر السلة في الـ actions
     appBar: AppBar(
       title: Text(widget.store.storeName, style: TextStyle(color: primaryColor)),
-      // 💡 استخدام لون الخلفية الديناميكي
+      //  استخدام لون الخلفية الديناميكي
       backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
-      // 💡 استخدام primaryColor للأيقونات والتكست
+      //  استخدام primaryColor للأيقونات والتكست
       foregroundColor: primaryColor,
       
-      // ⭐️⭐️ هذا هو التصحيح: وضع Consumer داخل مصفوفة actions ⭐️⭐️
+      //  هذا هو التصحيح: وضع Consumer داخل مصفوفة actions 
       actions: [
-                  // ⚠️ سنقلل Padding الخارجي جداً، ونتحمل الاقتطاع الطفيف للحفاظ على الموقع الأصلي
+                  //  سنقلل Padding الخارجي جداً، ونتحمل الاقتطاع الطفيف للحفاظ على الموقع الأصلي
                   Padding(
                     padding: const EdgeInsets.only(right: 5.0), // هامش بسيط لمنع القص الحاد
                     child: Consumer<CartManager>(
@@ -346,7 +346,7 @@ Widget build(BuildContext context) {
                         final totalItems = cartManager.totalItems;
                         final primaryIconColor = Theme.of(context).colorScheme.onSurface;
                         
-                        // ⭐️ نستخدم InkWell لتغليف الـ Stack بالكامل وجعل المنطقة قابلة للضغط ⭐️
+                        //  نستخدم InkWell لتغليف الـ Stack بالكامل وجعل المنطقة قابلة للضغط 
                         return InkWell(
                           onTap: () => Scaffold.of(context).openEndDrawer(), 
                           borderRadius: BorderRadius.circular(100), 
@@ -392,20 +392,20 @@ Widget build(BuildContext context) {
                       },
                     ),
                   ),
-                ], // ⭐️⭐️ يجب أن تكون مصفوفة الـ actions مغلقة هنا ⭐️⭐️
+                ], //  يجب أن تكون مصفوفة الـ actions مغلقة هنا 
     ),
     endDrawer: const Drawer(child: SideCartViewContents()),
     
     body: Stack(
       children: [
         SingleChildScrollView(
-          // 💡 محاكاة لـ systemGroupedBackground باستخدام لون الخلفية الأساسي
+          //  محاكاة لـ systemGroupedBackground باستخدام لون الخلفية الأساسي
           child: Container(
             color: scaffoldColor, 
             child: _buildWebContainer(
               child: Column(
                 children: [
-                  _buildStoreHeaderSection(context), // 💡 تمرير context
+                  _buildStoreHeaderSection(context), //  تمرير context
                   _buildProductsGridSection(),
                   const SizedBox(height: 30),
                 ],
@@ -415,8 +415,8 @@ Widget build(BuildContext context) {
         ),
         
         // عرض حالة الخطأ أو التحميل
-        if (_errorMessage.isNotEmpty) _buildErrorMessageView(context), // 💡 تمرير context
-        if (_isLoading) _buildLoadingIndicator(context), // 💡 تمرير context
+        if (_errorMessage.isNotEmpty) _buildErrorMessageView(context), //  تمرير context
+        if (_isLoading) _buildLoadingIndicator(context), //  تمرير context
       ],
     ),
   );

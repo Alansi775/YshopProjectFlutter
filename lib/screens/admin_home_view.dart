@@ -6,6 +6,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'admin_login_view.dart'; // للاعتماد على AdminLoginView في دالة _logout
 import 'store_products_view.dart'; // للاعتماد على StoreProductsView في _showRequestDetails
+import 'delivery_requests_view.dart'; // لاستيراد شاشة طلبات الموصلين
+
 
 //  تعريف الألوان الداكنة (التعديل: يجب أن تكون التعريفات الفريدة هنا فقط)
 const Color kDarkBackground = Color(0xFF1C1C1E); // خلفية الشاشة
@@ -92,7 +94,40 @@ class StoreRequest {
     );
   }
 }
-// نهاية النماذج المؤقتة
+
+// 💡 NEW: نموذج بيانات طلب الموصل
+class DeliveryRequest {
+  final String id;
+  final String name;
+  final String email;
+  final String phoneNumber;
+  final String nationalID;
+  final String address;
+  final String status;
+
+  DeliveryRequest({
+    required this.id,
+    required this.name,
+    required this.email,
+    required this.phoneNumber,
+    required this.nationalID,
+    required this.address,
+    required this.status,
+  });
+  
+  factory DeliveryRequest.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return DeliveryRequest(
+      id: doc.id,
+      name: data["name"] as String? ?? "",
+      email: data["email"] as String? ?? "",
+      phoneNumber: data["phoneNumber"] as String? ?? "N/A",
+      nationalID: data["nationalID"] as String? ?? "N/A",
+      address: data["address"] as String? ?? "N/A",
+      status: data["status"] as String? ?? "Pending",
+    );
+  }
+}
 
 // --------------------------------------------------
 // MARK: - Admin Home View
@@ -358,7 +393,7 @@ class _AdminHomeViewState extends State<AdminHomeView> {
         request: request,
         onUpdateStatus: _updateRequestStatus,
         onDismiss: _refreshData,
-        // 💡 تمرير دالة للانتقال إلى شاشة المنتجات
+        //  تمرير دالة للانتقال إلى شاشة المنتجات
         onViewProducts: () {
           // إغلاق الشيت أولاً ثم الانتقال
           Navigator.pop(context); 
@@ -412,6 +447,30 @@ class _AdminHomeViewState extends State<AdminHomeView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // 🚀 الزر الجديد لإدارة طلبات الموصلين
+        Center(
+          child: SizedBox(
+            width: 450,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const DeliveryRequestsView(), // سنقوم بإنشاء هذه الشاشة
+                  ),
+                ).then((_) => _refreshData()); // تحديث عند العودة
+              },
+              icon: const Icon(Icons.motorcycle, color: kAccentBlue),
+              label: const Text("Manage Driver Requests", style: TextStyle(color: kAccentBlue, fontSize: 18)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kAccentBlue.withOpacity(0.1),
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: 0,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 15), // فاصل بين الأزرار
         Center(
           child: SizedBox(
             width: 450,
@@ -517,7 +576,7 @@ class _ProductCardView extends StatelessWidget {
                     style: const TextStyle(fontSize: 12, color: kSecondaryTextColor),
                   ),
                   const SizedBox(height: 8),
-                  _StatusBadgeView(status: product.status),
+                  StatusBadgeView(status: product.status),
                 ],
               ),
             ),
@@ -628,7 +687,7 @@ class _StoreRequestCardView extends StatelessWidget {
                     style: const TextStyle(fontSize: 12, color: kSecondaryTextColor),
                   ),
                   const SizedBox(height: 8),
-                  _StatusBadgeView(status: request.status),
+                  StatusBadgeView(status: request.status),
                 ],
               ),
             ),
@@ -659,10 +718,10 @@ class _StoreRequestCardView extends StatelessWidget {
   }
 }
 
-class _StatusBadgeView extends StatelessWidget {
+class StatusBadgeView extends StatelessWidget {
   final String status;
 
-  const _StatusBadgeView({super.key, required this.status});
+  const StatusBadgeView({super.key, required this.status});
 
   @override
   Widget build(BuildContext context) {
@@ -966,7 +1025,7 @@ class _StoreRequestDetailView extends StatelessWidget {
               _DetailSection(
                 title: "Actions",
                 children: [
-                  // 💡 زر عرض المنتجات (يظل ElevatedButton)
+                  //  زر عرض المنتجات (يظل ElevatedButton)
 SizedBox(
                     width: double.infinity,
                     child: _ActionButton(
@@ -979,7 +1038,7 @@ SizedBox(
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      // 💡 استخدام _ActionTextButton (Accept)
+                      //  استخدام _ActionTextButton (Accept)
                       Expanded(
                         child: _ActionTextButton(
                           label: "Accept",
@@ -991,7 +1050,7 @@ SizedBox(
                         ),
                       ),
                       const SizedBox(width: 16),
-                      // 💡 استخدام _ActionTextButton (Reject)
+                      //  استخدام _ActionTextButton (Reject)
                       Expanded(
                         child: _ActionTextButton(
                           label: "Reject",
@@ -1003,7 +1062,7 @@ SizedBox(
                         ),
                       ),
                       const SizedBox(width: 16),
-                      // 💡 استخدام _ActionTextButton (Pending)
+                      //  استخدام _ActionTextButton (Pending)
                       Expanded(
                         child: _ActionTextButton(
                           label: "Pending",

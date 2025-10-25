@@ -6,7 +6,7 @@ class ThemeManager with ChangeNotifier {
   ThemeMode _themeMode = ThemeMode.light; // القيمة الافتراضية
   static const String _themeKey = 'selectedThemeMode';
 
-  // 💡 إضافة Constructor لتحميل الثيم فوراً
+  //  إضافة Constructor لتحميل الثيم فوراً
   ThemeManager() {
     _loadTheme(); 
   }

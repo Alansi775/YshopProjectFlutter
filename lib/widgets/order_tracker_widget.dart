@@ -1,15 +1,21 @@
-// lib/widgets/order_tracker_widget.dart (مصحح للثيم الديناميكي)
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart'; 
 import '../state_management/cart_manager.dart'; 
 
+// 🚀 الاستيرادات الجديدة للمتطلبات الجغرافية والخريطة
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'dart:async'; 
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+// --------------------------------------------------
+
 class OrderTrackerWidget extends StatelessWidget {
   const OrderTrackerWidget({Key? key}) : super(key: key);
   
-  // 💡 تم تعديل الدالة لتقبل context وتستخدم primaryColor افتراضيًا
+  // دالة مساعدة
   TextStyle _getTenorSansStyle(BuildContext context, double size, {FontWeight weight = FontWeight.normal, Color? color}) {
     final Color primaryColor = Theme.of(context).colorScheme.primary; 
     return TextStyle(
@@ -47,12 +53,10 @@ class OrderTrackerWidget extends StatelessWidget {
   // بناء مؤشر الحالة المتحرك
   Widget _buildTrackerIndicator(BuildContext context, String orderId, String status) {
     
-    Color statusColor = _getStatusColor(status); // 💡 استخدام دالة موحدة
+    Color statusColor = _getStatusColor(status);
 
-    // 💡 إخفاء الودجت إذا تم التوصيل ومسح الـ orderId
     if (status == 'Delivered') {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        // ننتظر قليلاً (اختياري) قبل المسح لإعطاء المستخدم وقتاً لرؤية الحالة
         Future.delayed(const Duration(seconds: 1), () {
             Provider.of<CartManager>(context, listen: false).setLastOrderId(null);
         });
@@ -90,7 +94,6 @@ class OrderTrackerWidget extends StatelessWidget {
             ],
           ),
           child: Center(
-            // 💡 لون الأيقونة يبقى أبيض ليتناقض مع ألوان الحالة
             child: Icon(statusIcon, color: Colors.white, size: 28), 
           ),
         ),
@@ -100,7 +103,6 @@ class OrderTrackerWidget extends StatelessWidget {
 
   // عرض الورقة السفلية لتفاصيل الطلب
   void _showOrderDetailsSheet(BuildContext context, String orderId, String currentStatus) {
-    // 💡 جلب الألوان الديناميكية
     final Color cardColor = Theme.of(context).cardColor;
     
     showModalBottomSheet(
@@ -111,7 +113,7 @@ class OrderTrackerWidget extends StatelessWidget {
         return Container(
           height: MediaQuery.of(context).size.height * 0.8, 
           decoration: BoxDecoration(
-            color: cardColor, // 💡 استخدام cardColor
+            color: cardColor, 
             borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(30.0), 
               topRight: Radius.circular(30.0), 
@@ -121,11 +123,10 @@ class OrderTrackerWidget extends StatelessWidget {
             stream: FirebaseFirestore.instance.collection('orders').doc(orderId).snapshots(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                // 💡 استخدام لون يتناسب مع الثيم (secondary)
                 return Center(child: CircularProgressIndicator(color: Theme.of(context).colorScheme.secondary)); 
               }
               if (!snapshot.hasData || !snapshot.data!.exists) {
-                return Center(child: Text("Order: $orderId Not Found", style: _getTenorSansStyle(context, 18))); // 💡 تمرير context
+                return Center(child: Text("Order: $orderId Not Found", style: _getTenorSansStyle(context, 18))); 
               }
 
               final orderData = snapshot.data!.data() as Map<String, dynamic>;
@@ -145,7 +146,6 @@ class OrderTrackerWidget extends StatelessWidget {
                   final storeType = storeTypeSnapshot.data ?? 'Food'; 
                   
                   if (storeTypeSnapshot.connectionState == ConnectionState.waiting) {
-                     // 💡 استخدام لون يتناسب مع الثيم (secondary)
                      return Center(child: CircularProgressIndicator(color: Theme.of(context).colorScheme.secondary));
                   }
               
@@ -159,7 +159,7 @@ class OrderTrackerWidget extends StatelessWidget {
     );
   }
 
-  // دالة جلب نوع المتجر (تبقى كما هي)
+  // دالة جلب نوع المتجر 
   Future<String?> _fetchStoreType(String storeEmail) async {
     try {
       final querySnapshot = await FirebaseFirestore.instance
@@ -177,29 +177,21 @@ class OrderTrackerWidget extends StatelessWidget {
     }
   }
 
-  // دالة تعيين أيقونة التحضير (تبقى كما هي)
+  // دالة تعيين أيقونة التحضير
   IconData _getPreparationIcon(String storeType) {
     switch (storeType.toLowerCase()) {
-      case 'market':
-        return Icons.shopping_basket_outlined; 
-      case 'clothes':
-        return Icons.checkroom_outlined; 
-      case 'pharmacy':
-        return Icons.medical_services_outlined; 
+      case 'market': return Icons.shopping_basket_outlined; 
+      case 'clothes': return Icons.checkroom_outlined; 
+      case 'pharmacy': return Icons.medical_services_outlined; 
       case 'food':
-      case 'restaurants':
-        return Icons.restaurant_menu_outlined; 
-      default:
-        return Icons.build; 
+      case 'restaurants': return Icons.restaurant_menu_outlined; 
+      default: return Icons.build; 
     }
   }
 
-  // ⭐️ ودجت المنتج لعرض قائمة الطلبات بشكل أنيق
+  // ودجت المنتج
   Widget _buildProductItem(BuildContext context, Map<String, dynamic> item) {
-    // 💡 جلب الألوان الديناميكية
     final Color secondaryColor = Theme.of(context).colorScheme.onSurface;
-    final Color cardColor = Theme.of(context).cardColor;
-    
     final price = (item['price'] as num?)?.toDouble() ?? 0.0;
     final quantity = item['quantity'] as int? ?? 1;
 
@@ -208,12 +200,11 @@ class OrderTrackerWidget extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ⭐️ صورة المنتج (حاوية أنيقة)
           Container(
             width: 60,
             height: 60,
             decoration: BoxDecoration(
-              color: secondaryColor.withOpacity(0.1), // 💡 لون ديناميكي خفيف
+              color: secondaryColor.withOpacity(0.1), 
               borderRadius: BorderRadius.circular(10),
               image: item['imageUrl'] != null
                   ? DecorationImage(
@@ -222,7 +213,6 @@ class OrderTrackerWidget extends StatelessWidget {
                     )
                   : null,
             ),
-            // 💡 استخدام secondaryColor للأيقونة
             child: item['imageUrl'] == null ? Icon(Icons.image_not_supported, color: secondaryColor.withOpacity(0.5)) : null,
           ),
           const SizedBox(width: 15),
@@ -231,25 +221,21 @@ class OrderTrackerWidget extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ⭐️ اسم المنتج
                 Text(
                   item['name'] as String? ?? 'Unknown Product',
-                  style: _getTenorSansStyle(context, 16, weight: FontWeight.w600), // 💡 تمرير context
+                  style: _getTenorSansStyle(context, 16, weight: FontWeight.w600), 
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
-                // ⭐️ السعر والكمية
                 Text(
                   'Qty: $quantity x \$${price.toStringAsFixed(2)}',
-                  // 💡 استخدام secondaryColor
                   style: _getTenorSansStyle(context, 14).copyWith(color: secondaryColor.withOpacity(0.7)),
                 ),
               ],
             ),
           ),
           
-          // ⭐️ الإجمالي الفرعي (لون برتقالي غير مُخيف)
           Text(
             '\$${(price * quantity).toStringAsFixed(2)}',
             style: _getTenorSansStyle(context, 16, weight: FontWeight.bold, color: Colors.deepOrange),
@@ -259,7 +245,7 @@ class OrderTrackerWidget extends StatelessWidget {
     );
   }
 
-  // ⭐️ ودجت أيقونة التوصيل المخصصة (تبقى كما هي)
+  // ودجت أيقونة التوصيل المخصصة
   IconData _getDeliveryIcon(String deliveryOption) {
     if (deliveryOption.toLowerCase().contains('drone')) {
       return Icons.flight; 
@@ -270,7 +256,7 @@ class OrderTrackerWidget extends StatelessWidget {
     }
   }
 
-  // 💡 المحتوى الرئيسي للورقة السفلية (تم تحسينه)
+  // المحتوى الرئيسي للورقة السفلية
   Widget _buildOrderDetailsContent(BuildContext context, Map<String, dynamic> orderData, String storeType) {
     final status = orderData['status'] as String? ?? 'Pending';
     final total = (orderData['total'] as num?)?.toDouble() ?? 0.0;
@@ -281,17 +267,13 @@ class OrderTrackerWidget extends StatelessWidget {
     final items = orderData['items'] as List<dynamic>? ?? [];
     final storeName = (items.isNotEmpty) ? items.first['storeName'] : 'Unknown Store';
     
-    // 💡 جلب الألوان الديناميكية
     final Color primaryColor = Theme.of(context).colorScheme.primary; 
-    final Color secondaryColor = Theme.of(context).colorScheme.onSurface;
-    
-    final paymentMethod = orderData['paymentMethod'] as String? ?? 'Not Specified'; 
-    final preparationIcon = _getPreparationIcon(storeType); 
-    
     final timeFormat = DateFormat('h:mm a'); 
     final dateFormat = DateFormat('MMM d'); 
     final formattedTime = '${timeFormat.format(date)} - ${dateFormat.format(date)}';
-
+    final paymentMethod = orderData['paymentMethod'] as String? ?? 'Not Specified'; 
+    final preparationIcon = _getPreparationIcon(storeType); 
+    
     final trackingSteps = [
       {'title': 'Order Placed', 'status': 'Pending', 'icon': Icons.verified_user_outlined},
       {'title': 'Preparation', 'status': 'Processing', 'icon': preparationIcon}, 
@@ -309,13 +291,11 @@ class OrderTrackerWidget extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), 
               decoration: BoxDecoration(
-                // 💡 استخدام لون ثانوي خفيف
-                color: secondaryColor.withOpacity(0.1), 
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.1), 
                 borderRadius: BorderRadius.circular(25),
               ),
               child: Text(
                 "Order: $documentId",
-                // 💡 استخدام primaryColor
                 style: _getTenorSansStyle(context, 14, weight: FontWeight.w600, color: primaryColor), 
                 textAlign: TextAlign.center, 
                 softWrap: true, 
@@ -325,15 +305,28 @@ class OrderTrackerWidget extends StatelessWidget {
           const SizedBox(height: 25), 
           
           // 2. شريط التتبع الأفقي
-          _buildTrackingTimeline(context, trackingSteps, status), // 💡 تمرير context
+          _buildTrackingTimeline(context, trackingSteps, status), 
           
-          // 💡 استخدام Divider يتكيف مع الثيم
+          // 💡 إضافة خريطة التتبع المباشر
+          if (status == 'Out for Delivery') ...[
+            Divider(height: 30, thickness: 1.5, color: Theme.of(context).dividerColor),
+            Center(
+              child: Text(
+                "Driver Location (Live)", 
+                style: _getTenorSansStyle(context, 18, weight: FontWeight.bold).copyWith(color: _getStatusColor(status)),
+              ),
+            ),
+            const SizedBox(height: 15),
+            // 💡 استخدام ودجت جديد Stateful لإدارة التحديثات
+            DeliveryMapStatefulWidget(orderData: orderData, getTenorSansStyle: _getTenorSansStyle), 
+          ],
+
           Divider(height: 30, thickness: 1.5, color: Theme.of(context).dividerColor),
 
           // 3. تفاصيل الطلب السريعة واسم المتجر
           Text(
             "$storeName Order Summary", 
-            style: _getTenorSansStyle(context, 18, weight: FontWeight.bold), // 💡 تمرير context
+            style: _getTenorSansStyle(context, 18, weight: FontWeight.bold), 
           ),
           const SizedBox(height: 15),
           
@@ -341,7 +334,6 @@ class OrderTrackerWidget extends StatelessWidget {
           _buildDetailRow(context, "Payment Method:", paymentMethod, icon: Icons.credit_card_outlined), 
           _buildDetailRow(context, "Total Amount:", "\$${total.toStringAsFixed(2)}", color: Colors.deepOrange),
           
-          // 💡 استخدام Divider يتكيف مع الثيم
           Divider(height: 30, thickness: 0.8, color: Theme.of(context).dividerColor),
           
           // 4. قائمة المنتجات
@@ -353,7 +345,6 @@ class OrderTrackerWidget extends StatelessWidget {
           
           ...items.map((item) => _buildProductItem(context, item as Map<String, dynamic>)).toList(),
           
-          // 💡 استخدام Divider يتكيف مع الثيم
           Divider(height: 30, thickness: 0.8, color: Theme.of(context).dividerColor),
           
           // 5. معلومات التوصيل
@@ -375,9 +366,8 @@ class OrderTrackerWidget extends StatelessWidget {
     );
   }
 
-  // ودجت مساعد لبناء صفوف التفاصيل (مع دعم الأيقونات)
+  // ودجت مساعد لبناء صفوف التفاصيل
   Widget _buildDetailRow(BuildContext context, String label, dynamic value, {Color? color, IconData? icon, bool isAddress = false}) {
-    // 💡 جلب الألوان الديناميكية
     final Color secondaryColor = Theme.of(context).colorScheme.onSurface;
     
     return Padding(
@@ -385,28 +375,22 @@ class OrderTrackerWidget extends StatelessWidget {
       child: Row(
         crossAxisAlignment: isAddress ? CrossAxisAlignment.start : CrossAxisAlignment.center, 
         children: [
-          // ⭐️ أيقونة
           if (icon != null) ...[
-            // 💡 استخدام secondaryColor
             Icon(icon, size: 20, color: secondaryColor.withOpacity(0.7)),
             const SizedBox(width: 10),
           ],
           
-          // 1. Label
           SizedBox(
             width: 130, 
             child: Text(
               label, 
-              // 💡 استخدام secondaryColor
               style: _getTenorSansStyle(context, 15).copyWith(color: secondaryColor.withOpacity(0.7)),
             ),
           ),
           
-          // 2. Value
           Expanded( 
             child: Text(
               value.toString(),
-              // 💡 استخدام primaryColor إذا لم يتم تحديد لون
               style: _getTenorSansStyle(context, 15, weight: FontWeight.w600).copyWith(color: color),
               textAlign: TextAlign.right, 
               maxLines: isAddress ? 4 : 2, 
@@ -418,9 +402,8 @@ class OrderTrackerWidget extends StatelessWidget {
     );
   }
   
-  // ودجت بناء شريط التتبع (أيقونات واضحة)
+  // ودجت بناء شريط التتبع
   Widget _buildTrackingTimeline(BuildContext context, List<Map<String, dynamic>> steps, String currentStatus) {
-    // 💡 جلب الألوان الديناميكية
     final Color primaryColor = Theme.of(context).colorScheme.primary; 
     
     return SizedBox(
@@ -432,13 +415,12 @@ class OrderTrackerWidget extends StatelessWidget {
           
           Color statusColor = _getStatusColor(step['status']);
           
-          final color = isCompleted ? statusColor : Theme.of(context).dividerColor; // 💡 استخدام لون الـ Divider للخطوات غير المكتملة
+          final color = isCompleted ? statusColor : Theme.of(context).dividerColor; 
           final icon = step['icon'] as IconData;
           
           return Expanded( 
             child: Column(
               children: [
-                // ⭐️ أيقونة الخطوة
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
@@ -449,10 +431,8 @@ class OrderTrackerWidget extends StatelessWidget {
                   child: Icon(icon, color: color, size: 28),
                 ),
                 const SizedBox(height: 5),
-                // ⭐️ عنوان الخطوة
                 Text(
                   step['title'] as String, 
-                  // 💡 استخدام لون الخطوة المكتملة أو primaryColor للخطوة غير المكتملة
                   style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600), 
                   textAlign: TextAlign.center, 
                   maxLines: 1,
@@ -466,7 +446,7 @@ class OrderTrackerWidget extends StatelessWidget {
     );
   }
 
-  // دالة مساعدة لتحديد ما إذا كانت الخطوة قد اكتملت (تبقى كما هي)
+  // دالة مساعدة لتحديد ما إذا كانت الخطوة قد اكتملت
   bool _isStepCompleted(String stepStatus, String currentStatus) {
     final statusOrder = ['Pending', 'Processing', 'Out for Delivery', 'Delivered'];
     final currentStatusIndex = statusOrder.indexOf(currentStatus);
@@ -474,7 +454,7 @@ class OrderTrackerWidget extends StatelessWidget {
     return currentStatusIndex >= stepStatusIndex;
   }
   
-  // دالة مساعدة للحصول على لون الحالة (تبقى كما هي)
+  // دالة مساعدة للحصول على لون الحالة
   Color _getStatusColor(String status) {
     switch (status) {
       case 'Pending': return Colors.lightBlue.shade600; 
@@ -483,5 +463,316 @@ class OrderTrackerWidget extends StatelessWidget {
       case 'Delivered': return Colors.green.shade700;
       default: return Colors.red.shade600;
     }
+  }
+}
+
+// --------------------------------------------------
+// 🚀 الودجت Stateful الجديد لإدارة تحديث الخريطة والـ ETA
+// --------------------------------------------------
+class DeliveryMapStatefulWidget extends StatefulWidget {
+  final Map<String, dynamic> orderData;
+  final TextStyle Function(BuildContext, double, {FontWeight weight, Color? color}) getTenorSansStyle;
+
+  const DeliveryMapStatefulWidget({
+    Key? key,
+    required this.orderData,
+    required this.getTenorSansStyle,
+  }) : super(key: key);
+
+  @override
+  State<DeliveryMapStatefulWidget> createState() => _DeliveryMapStatefulWidgetState();
+}
+
+class _DeliveryMapStatefulWidgetState extends State<DeliveryMapStatefulWidget> {
+  // 🚨 استبدل هذا المفتاح بمفتاح Mapbox Access Token الخاص بك.
+  static const String MAPBOX_ACCESS_TOKEN = 'pk.eyJ1IjoibW9oYW1tZWRhbGFuc2kiLCJhIjoiY21ncGF5OTI0MGU2azJpczloZjI0YXRtZCJ9.W9tMyxkXcai-sHajAwp8NQ';
+  
+  List<LatLng> _routePoints = [];
+  String _eta = 'Calculating ETA...';
+  Timer? _updateTimer;
+  MapController _mapController = MapController();
+  
+  bool _boundsAdjusted = false; 
+
+  // متغيرات تستخرج من الـ orderData
+  late LatLng customerLocation;
+  GeoPoint? driverLocationGeo;
+  LatLng? driverLocation;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeLocations();
+    _startPeriodicUpdate();
+  }
+
+  @override
+  void didUpdateWidget(covariant DeliveryMapStatefulWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.orderData != oldWidget.orderData) {
+      _initializeLocations();
+      _fetchRouteAndEta(); 
+    }
+  }
+
+  @override
+  void dispose() {
+    _updateTimer?.cancel();
+    super.dispose();
+  }
+  
+  void _initializeLocations() {
+    final double customerLat = (widget.orderData['location_Latitude'] as num?)?.toDouble() ?? 0.0;
+    final double customerLon = (widget.orderData['location_Longitude'] as num?)?.toDouble() ?? 0.0;
+    customerLocation = LatLng(customerLat, customerLon);
+    
+    driverLocationGeo = widget.orderData['driverLocation'] as GeoPoint?;
+    driverLocation = driverLocationGeo != null
+        ? LatLng(driverLocationGeo!.latitude, driverLocationGeo!.longitude)
+        : null;
+  }
+
+  void _startPeriodicUpdate() {
+    _updateTimer?.cancel(); 
+    _updateTimer = Timer.periodic(const Duration(seconds: 8), (timer) {
+      FirebaseFirestore.instance
+          .collection('orders')
+          .doc(widget.orderData['documentId'] as String)
+          .get()
+          .then((snapshot) {
+            if (snapshot.exists && snapshot.data() != null) {
+              final newDriverGeo = snapshot.data()!['driverLocation'] as GeoPoint?;
+              if (newDriverGeo != null) {
+                driverLocationGeo = newDriverGeo;
+                driverLocation = LatLng(newDriverGeo.latitude, newDriverGeo.longitude);
+                _fetchRouteAndEta();
+              }
+            }
+          });
+    });
+    _fetchRouteAndEta();
+  }
+
+  void _fetchRouteAndEta() async {
+    if (driverLocation == null) {
+      if (mounted) {
+        setState(() {
+          _eta = 'Waiting for driver location...';
+          _routePoints = [];
+        });
+      }
+      return;
+    }
+    
+    final coordinates = 
+        '${driverLocation!.longitude},${driverLocation!.latitude};${customerLocation.longitude},${customerLocation.latitude}';
+        
+    final url = Uri.parse(
+      'http://router.project-osrm.org/route/v1/driving/$coordinates?geometries=geojson&overview=full'
+    );
+
+    try {
+      final response = await http.get(url);
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        
+        if (data['routes'] != null && data['routes'].isNotEmpty) {
+          final route = data['routes'][0];
+          
+          final durationInSeconds = route['duration'] as double;
+          final minutes = (durationInSeconds / 60).ceil();
+          final newEta = '$minutes min';
+          
+          final List<dynamic> coords = route['geometry']['coordinates'];
+          final List<LatLng> newRoutePoints = coords.map<LatLng>((coord) {
+            return LatLng(coord[1] as double, coord[0] as double);
+          }).toList();
+
+          if (mounted) {
+            setState(() {
+              _routePoints = newRoutePoints;
+              _eta = newEta;
+            });
+            
+            if (!_boundsAdjusted) {
+               _adjustMapBounds();
+               _boundsAdjusted = true;
+            }
+          }
+          return;
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _eta = 'No route found';
+          _routePoints = [];
+        });
+      }
+
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _eta = 'Error calculating ETA';
+          _routePoints = [];
+        });
+      }
+    }
+  }
+  
+  void _adjustMapBounds() {
+    if (driverLocation == null) return;
+    
+    // لضمان رؤية النقطتين
+    final points = [driverLocation!, customerLocation];
+    final bounds = LatLngBounds.fromPoints(points);
+    
+    _mapController.move(
+      LatLng(
+        (driverLocation!.latitude + customerLocation.latitude) / 2,
+        (driverLocation!.longitude + customerLocation.longitude) / 2,
+      ), 
+      14.0 // زوم مناسب لرؤية الطريق
+    );
+  }
+
+
+  @override
+  Widget build(BuildContext context) {
+    
+    LatLng mapCenter = driverLocation != null
+        ? LatLng(
+            (driverLocation!.latitude + customerLocation.latitude) / 2,
+            (driverLocation!.longitude + customerLocation.longitude) / 2,
+          )
+        : customerLocation;
+        
+    double initialZoom = driverLocation != null ? 14.0 : 12.0;
+
+    return Column(
+      children: [
+        // شريط ETA في الأعلى
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+          decoration: BoxDecoration(
+            color: Colors.green.shade600.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.green.shade600),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.timer_outlined, color: Colors.green, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Estimated Arrival: $_eta',
+                style: widget.getTenorSansStyle(context, 15, weight: FontWeight.bold).copyWith(color: Colors.green.shade700),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        
+        // الخريطة
+        Container(
+          height: 300, 
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.5)),
+          ),
+          child: FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              initialCenter: mapCenter,
+              initialZoom: initialZoom,
+              interactionOptions: const InteractionOptions(
+                flags: InteractiveFlag.drag | InteractiveFlag.pinchZoom | InteractiveFlag.doubleTapZoom,
+              ),
+            ),
+            children: [
+              // 💡 طبقة الخريطة المظلمة (Mapbox Dark/Night Mode)
+              TileLayer(
+                urlTemplate: 'https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/{z}/{x}/{y}?access_token=$MAPBOX_ACCESS_TOKEN',
+                userAgentPackageName: 'com.yshop.customer.app',
+              ),
+              
+              // 💡 خط سير الموصل (لون أزرق) - يظهر الطريق بين السائق والزبون
+              PolylineLayer(
+                polylines: [
+                  if (_routePoints.isNotEmpty)
+                    Polyline(
+                      points: _routePoints,
+                      color: Colors.blue.shade600, // اللون الأزرق المطلوب للطريق
+                      strokeWidth: 6.0,
+                    ),
+                ],
+              ),
+              
+              // طبقة العلامات
+              MarkerLayer(
+                markers: [
+                  // 1. علامة موقع الزبون (YOU)
+                  Marker(
+                    point: customerLocation,
+                    width: 50,
+                    height: 50,
+                    // 💡 أيقونة الزبون: دائرة بيضاء بداخلها YOU بالأسود
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white, // دائرة بيضاء
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.black, width: 2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.5),
+                            blurRadius: 5,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Text(
+                          'YOU', // الأحرف المطلوبة
+                          style: widget.getTenorSansStyle(context, 14, weight: FontWeight.bold, color: Colors.black),
+                        ),
+                      ),
+                    ),
+                  ),
+                  
+                  // 2. علامة موقع الموصل (YS)
+                  if (driverLocation != null)
+                    Marker(
+                      point: driverLocation!,
+                      width: 50,
+                      height: 50,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black, // دائرة سوداء
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.green.withOpacity(0.7),
+                              blurRadius: 10,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: Center(
+                          child: Text(
+                            'YS', // الأحرف المطلوبة
+                            style: widget.getTenorSansStyle(context, 16, weight: FontWeight.bold, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }

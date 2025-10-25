@@ -127,7 +127,7 @@ class _ChatViewState extends State<ChatView> {
   // --------------------------------------------------
   @override
   Widget build(BuildContext context) {
-    // 💡 جلب الألوان الديناميكية
+    //  جلب الألوان الديناميكية
     final Color primaryColor = Theme.of(context).colorScheme.primary;
 
     return Scaffold(
@@ -135,7 +135,7 @@ class _ChatViewState extends State<ChatView> {
         title: Text(widget.product.name),
         centerTitle: false,
         elevation: 1,
-        // 💡 استخدام الألوان الديناميكية من الثيم
+        //  استخدام الألوان الديناميكية من الثيم
         backgroundColor: Theme.of(context).appBarTheme.backgroundColor, 
         foregroundColor: primaryColor,
       ),
@@ -155,11 +155,11 @@ class _ChatViewState extends State<ChatView> {
                 builder: (context, snapshot) {
                   
                   if (snapshot.hasError) {
-                    // 💡 استخدام primaryColor للنص
+                    //  استخدام primaryColor للنص
                     return Center(child: Text('Error: ${snapshot.error.toString()}\nCheck Firestore Rules and Chat IDs.', style: TextStyle(color: primaryColor)));
                   }
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    // 💡 استخدام primaryColor للمؤشر
+                    //  استخدام primaryColor للمؤشر
                     return Center(child: CircularProgressIndicator(color: primaryColor));
                   }
                   
@@ -168,7 +168,7 @@ class _ChatViewState extends State<ChatView> {
                       .toList();
                   
                   WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (messages.isNotEmpty && _scrollController.isAttached) { // 💡 إضافة تحقق من isAttached
+                    if (messages.isNotEmpty && _scrollController.isAttached) { //  إضافة تحقق من isAttached
                       _scrollController.scrollTo(
                         index: messages.length - 1,
                         duration: const Duration(milliseconds: 300),
@@ -208,7 +208,7 @@ class _ChatViewState extends State<ChatView> {
   // MARK: - ودجت حقل الإدخال
   // --------------------------------------------------
   Widget _buildMessageComposer() {
-    // 💡 جلب الألوان الديناميكية
+    //  جلب الألوان الديناميكية
     final Color primaryColor = Theme.of(context).colorScheme.primary;
     final Color inputFillColor = Theme.of(context).brightness == Brightness.light 
         ? Colors.grey.shade100 
@@ -217,9 +217,9 @@ class _ChatViewState extends State<ChatView> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
       decoration: BoxDecoration(
-        // 💡 استخدام لون خلفية النظام أو الـ CardColor
+        //  استخدام لون خلفية النظام أو الـ CardColor
         color: Theme.of(context).cardColor, 
-        // 💡 استخدام DividerColor
+        //  استخدام DividerColor
         border: Border(top: BorderSide(color: Theme.of(context).dividerColor, width: 1)),
       ),
       child: Row(
@@ -228,11 +228,11 @@ class _ChatViewState extends State<ChatView> {
             child: TextField(
               controller: _messageController,
               onSubmitted: (value) => _sendMessage(), 
-              style: TextStyle(color: primaryColor), // 💡 لون النص
+              style: TextStyle(color: primaryColor), //  لون النص
               decoration: InputDecoration(
                 hintText: "Type a message...",
-                hintStyle: TextStyle(color: primaryColor.withOpacity(0.5)), // 💡 لون التلميح
-                fillColor: inputFillColor, // 💡 لون خلفية الحقل الديناميكي
+                hintStyle: TextStyle(color: primaryColor.withOpacity(0.5)), //  لون التلميح
+                fillColor: inputFillColor, //  لون خلفية الحقل الديناميكي
                 filled: true,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(25),
@@ -247,7 +247,7 @@ class _ChatViewState extends State<ChatView> {
           const SizedBox(width: 8),
           
           // زر الإرسال
-          // 💡 استخدام primaryColor لزر الإرسال
+          //  استخدام primaryColor لزر الإرسال
           FloatingActionButton.small(
             heroTag: "send_button",
             onPressed: _sendMessage,
@@ -277,13 +277,13 @@ class MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 💡 جلب الألوان الديناميكية
+    //  جلب الألوان الديناميكية
     final Color primaryColor = Theme.of(context).colorScheme.primary;
     final Color secondaryColor = Theme.of(context).colorScheme.onSurface;
     
     final alignment = isCurrentUser ? Alignment.centerRight : Alignment.centerLeft;
     
-    // 💡 تعديل ألوان الخلفية والنص
+    //  تعديل ألوان الخلفية والنص
     final Color bubbleColor = isCurrentUser 
         ? primaryColor // لون الفقاعة للمرسل هو اللون الأساسي
         : Theme.of(context).brightness == Brightness.light 
@@ -294,7 +294,7 @@ class MessageBubble extends StatelessWidget {
         ? Theme.of(context).colorScheme.onPrimary // لون النص للمرسل هو لون التباين الأساسي (عادة الأبيض)
         : secondaryColor; // لون النص للمستقبل هو لون النص الطبيعي للنظام (أسود/أبيض)
     
-    // 💡 لون وقت الرسالة
+    //  لون وقت الرسالة
     final Color timeColor = secondaryColor.withOpacity(0.5);
 
     return Container(
@@ -314,7 +314,7 @@ class MessageBubble extends StatelessWidget {
                 bottomRight: isCurrentUser ? const Radius.circular(3) : const Radius.circular(15),
               ),
               boxShadow: [
-                // 💡 استخدام primaryColor للظل (بشفافية عالية لتجنب الظل القوي في الثيم الداكن)
+                //  استخدام primaryColor للظل (بشفافية عالية لتجنب الظل القوي في الثيم الداكن)
                 BoxShadow(
                   color: primaryColor.withOpacity(0.05),
                   blurRadius: 2,

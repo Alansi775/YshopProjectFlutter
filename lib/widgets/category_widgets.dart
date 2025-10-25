@@ -40,7 +40,7 @@ class _CategoryCardState extends State<CategoryCard> {
   
   @override
   Widget build(BuildContext context) {
-    // 💡 الحصول على الألوان الديناميكية للخلفية والنص
+    //  الحصول على الألوان الديناميكية للخلفية والنص
     final Color primaryColor = Theme.of(context).colorScheme.primary; 
     final Color cardBackgroundColor = Theme.of(context).cardColor;
     
@@ -59,7 +59,7 @@ class _CategoryCardState extends State<CategoryCard> {
           height: 160,
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            // 💡 التعديل: استخدام لون البطاقة الديناميكي
+            //  التعديل: استخدام لون البطاقة الديناميكي
             color: cardBackgroundColor, 
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
@@ -77,7 +77,7 @@ class _CategoryCardState extends State<CategoryCard> {
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  // ⚠️ هذا اللون يبقى ثابتًا لتحديد الفئة
+                  //  هذا اللون يبقى ثابتًا لتحديد الفئة
                   color: cardColor, 
                   boxShadow: [
                     BoxShadow(
@@ -94,11 +94,11 @@ class _CategoryCardState extends State<CategoryCard> {
                 ),
               ),
               const SizedBox(height: 10),
-              // 💡 التعديل: استخدام اللون الأساسي الديناميكي للنص
+              //  التعديل: استخدام اللون الأساسي الديناميكي للنص
               Text(
                 widget.category,
                 textAlign: TextAlign.center,
-                style: TextStyle( // ⚠️ إزالة const
+                style: TextStyle( //  إزالة const
                   fontSize: 16, 
                   fontWeight: FontWeight.w600,
                   color: primaryColor, // سيصبح أبيض في الوضع الداكن
@@ -124,7 +124,7 @@ class CategoriesGridView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 💡 الحصول على اللون الأساسي للنص
+    //  الحصول على اللون الأساسي للنص
     final Color primaryColor = Theme.of(context).colorScheme.primary; 
     
     return Padding(
@@ -136,8 +136,8 @@ class CategoriesGridView extends StatelessWidget {
             padding: const EdgeInsets.only(left: 10, bottom: 30),
             child: Text(
               "Explore Categories",
-              // 💡 التعديل: استخدام اللون الأساسي الديناميكي للنص (لحل مشكلة اللون الأسود الثابت)
-              style: TextStyle( // ⚠️ إزالة const
+              //  التعديل: استخدام اللون الأساسي الديناميكي للنص (لحل مشكلة اللون الأسود الثابت)
+              style: TextStyle( //  إزالة const
                 fontSize: 20, 
                 fontWeight: FontWeight.w600,
                 color: primaryColor, 
@@ -160,8 +160,15 @@ class CategoriesGridView extends StatelessWidget {
               return InkWell(
                 onTap: () {
                   Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => StoresListView(categoryName: category), 
+                    PageRouteBuilder(
+                      pageBuilder: (context, animation, secondaryAnimation) => StoresListView(categoryName: category),
+                      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                        return FadeTransition(
+                          opacity: animation.drive(Tween(begin: 0.0, end: 1.0)),
+                          child: child,
+                        );
+                      },
+                      transitionDuration: const Duration(milliseconds: 300),
                     ),
                   );
                 },
@@ -195,7 +202,7 @@ class BrandShowcaseView extends StatelessWidget {
 
     // 2. تطبيق فلتر الألوان إذا كان الوضع داكناً
     if (brightness == Brightness.dark) {
-      // 💡 ColorFilter.matrix لعكس الألوان (تحويل الأسود إلى أبيض)
+      //  ColorFilter.matrix لعكس الألوان (تحويل الأسود إلى أبيض)
       brandImage = ColorFiltered(
         // هذه المصفوفة تعكس قيم الألوان (R, G, B) مما يحول الأسود (0) إلى أبيض (255)
         colorFilter: const ColorFilter.matrix(<double>[

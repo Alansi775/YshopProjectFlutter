@@ -28,31 +28,27 @@ class ProductDetailView extends StatefulWidget {
 class _ProductDetailViewState extends State<ProductDetailView> {
   // MARK: - State Variables
   int _quantity = 1;
-  
-  // ⚠️ تم حذف تعريفات الألوان الثابتة هنا
-  // final Color primaryText = Colors.black;
-  // final Color secondaryText = Colors.grey;
-  // final Color greenColor = Colors.green.shade700;
+  final GlobalKey _cartIconKey = GlobalKey(); 
   
   final String fontTenor = 'TenorSans'; // يبقى ثابتًا كاسم خط
 
   // MARK: - Helper Methods
 
-  // 💡 تم تعديل الدالة لتقبل اللون الأساسي الديناميكي
+  //  تم تعديل الدالة لتقبل اللون الأساسي الديناميكي
   TextStyle _getTenorSansStyle(BuildContext context, double size, {FontWeight weight = FontWeight.normal, Color? color}) {
     final Color primaryColor = Theme.of(context).colorScheme.primary; 
     return TextStyle(
       fontFamily: fontTenor,
       fontSize: size,
       fontWeight: weight,
-      color: color ?? primaryColor, // 💡 استخدام primaryColor افتراضياً
+      color: color ?? primaryColor, //  استخدام primaryColor افتراضياً
     );
   }
 
   // MARK: - View Components
 
   Widget _buildQuantitySelector(BuildContext context) {
-    // 💡 جلب الألوان الديناميكية
+    //  جلب الألوان الديناميكية
     final Color cardColor = Theme.of(context).cardColor;
     final Color primaryColor = Theme.of(context).colorScheme.primary; 
 
@@ -60,7 +56,7 @@ class _ProductDetailViewState extends State<ProductDetailView> {
       padding: const EdgeInsets.all(16),
       margin: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
-        // 💡 استخدام cardColor
+        //  استخدام cardColor
         color: cardColor,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
@@ -71,7 +67,7 @@ class _ProductDetailViewState extends State<ProductDetailView> {
         children: [
           Text(
             "Quantity:",
-            style: _getTenorSansStyle(context, 18), // 💡 تمرير context
+            style: _getTenorSansStyle(context, 18), //  تمرير context
           ),
           const Spacer(),
           Row(
@@ -96,7 +92,7 @@ class _ProductDetailViewState extends State<ProductDetailView> {
               
               Text(
                 "$_quantity",
-                style: _getTenorSansStyle(context, 24), // 💡 تمرير context
+                style: _getTenorSansStyle(context, 24), //  تمرير context
               ),
               
               const SizedBox(width: 20),
@@ -122,7 +118,7 @@ class _ProductDetailViewState extends State<ProductDetailView> {
 
   // دالة بناء معلومات المتجر
   Widget _buildStoreInfo(BuildContext context) {
-    // 💡 جلب الألوان الديناميكية
+    //  جلب الألوان الديناميكية
     final Color cardColor = Theme.of(context).cardColor;
     final Color primaryColor = Theme.of(context).colorScheme.primary;
     final Color secondaryColor = Theme.of(context).colorScheme.onSurface; 
@@ -134,7 +130,7 @@ class _ProductDetailViewState extends State<ProductDetailView> {
       padding: const EdgeInsets.all(16),
       margin: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
-        // 💡 استخدام cardColor
+        //  استخدام cardColor
         color: cardColor,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
@@ -146,11 +142,11 @@ class _ProductDetailViewState extends State<ProductDetailView> {
         children: [
           Row(
             children: [
-              Icon(Icons.storefront, size: 20, color: secondaryColor), // 💡 استخدام secondaryColor
+              Icon(Icons.storefront, size: 20, color: secondaryColor), //  استخدام secondaryColor
               const SizedBox(width: 10),
               Text(
                 widget.product.storeName,
-                style: _getTenorSansStyle(context, 16), // 💡 تمرير context
+                style: _getTenorSansStyle(context, 16), //  تمرير context
               ),
               const Spacer(),
             ],
@@ -161,11 +157,11 @@ class _ProductDetailViewState extends State<ProductDetailView> {
               padding: const EdgeInsets.only(top: 8.0),
               child: Row(
                 children: [
-                  Icon(Icons.phone, size: 20, color: secondaryColor), // 💡 استخدام secondaryColor
+                  Icon(Icons.phone, size: 20, color: secondaryColor), //  استخدام secondaryColor
                   const SizedBox(width: 10),
                   Text(
                     storePhone!, 
-                    style: _getTenorSansStyle(context, 16), // 💡 تمرير context
+                    style: _getTenorSansStyle(context, 16), //  تمرير context
                   ),
                   const Spacer(),
                 ],
@@ -178,36 +174,50 @@ class _ProductDetailViewState extends State<ProductDetailView> {
 
 
   void _showAddedToCartNotification(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.check_circle, color: Colors.greenAccent, size: 24),
-            const SizedBox(width: 12),
-            Text(
-              "${widget.product.name} Added to Cart!",
-              style: _getTenorSansStyle(context, 16).copyWith(color: Colors.white, fontWeight: FontWeight.bold),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-        // يمكنك استخدام لون داكن للخلفية ليتناسب مع أي ثيم
-        backgroundColor: Colors.black87, 
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating, // يجعلها عائمة وأنيقة
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10.0),
-        ),
-        margin: const EdgeInsets.only(bottom: 20, left: 10, right: 10),
-      ),
-    );
+  // 1. تحديد موقع الأيقونة على الشاشة
+  final RenderBox? renderBox = _cartIconKey.currentContext?.findRenderObject() as RenderBox?;
+  if (renderBox == null) {
+    // في حال فشل تحديد الموقع، نعود للإشعار التقليدي أو نلغي العملية
+    // يمكنك هنا وضع الإشعار التقليدي باستخدام ScaffoldMessenger.of(context).showSnackBar
+    return;
   }
+  
+  // 2. حساب الموضع الإحداثي لأيقونة السلة
+  final Offset iconPosition = renderBox.localToGlobal(Offset.zero);
+  final Size iconSize = renderBox.size;
+
+  final String productName = widget.product.name;
+  
+  OverlayEntry? overlayEntry;
+
+  // تعريف الـ OverlayEntry
+  overlayEntry = OverlayEntry(
+    builder: (context) => FocusTransitionOverlay( // 🚨 استخدام الـ Widget الجديد
+      productName: productName,
+      startPosition: iconPosition, // موقع البداية
+      startSize: iconSize, // حجم البداية
+      // موقع النهاية (منتصف الشاشة)
+      endPosition: Offset(
+        MediaQuery.of(context).size.width / 2, 
+        MediaQuery.of(context).size.height / 2,
+      ),
+      // تمرير دالة لإزالة الـ Overlay
+      onDismiss: () {
+        overlayEntry?.remove();
+        overlayEntry = null;
+      },
+      getTenorSansStyle: _getTenorSansStyle,
+    ),
+  );
+
+  // إضافة الـ OverlayEntry إلى الـ Overlay
+  Overlay.of(context).insert(overlayEntry!);
+}
   
   Widget _buildStickyBottomBar(BuildContext context) {
     final cartManager = Provider.of<CartManager>(context, listen: false);
     
-    // 💡 جلب الألوان الديناميكية
+    //  جلب الألوان الديناميكية
     final Color primaryColor = Theme.of(context).colorScheme.primary; 
     final Color secondaryColor = Theme.of(context).colorScheme.onSurface; 
     final Color cardColor = Theme.of(context).cardColor;
@@ -218,10 +228,10 @@ class _ProductDetailViewState extends State<ProductDetailView> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // 💡 استخدام secondaryColor للفاصل
+        //  استخدام secondaryColor للفاصل
         Divider(height: 1, color: secondaryColor.withOpacity(0.3)),
         Container(
-          // 💡 استخدام cardColor
+          //  استخدام cardColor
           color: cardColor,
           padding: const EdgeInsets.all(16),
           child: Row(
@@ -232,7 +242,7 @@ class _ProductDetailViewState extends State<ProductDetailView> {
                 children: [
                   Text(
                     "Total Price",
-                    // 💡 استخدام secondaryColor
+                    //  استخدام secondaryColor
                     style: _getTenorSansStyle(context, 14).copyWith(color: secondaryColor),
                   ),
                   Text(
@@ -252,7 +262,7 @@ class _ProductDetailViewState extends State<ProductDetailView> {
                   Navigator.of(context).pop(); 
                 },
                 style: ElevatedButton.styleFrom(
-                  // 💡 استخدام primaryColor كخلفية للزر (سيكون داكناً في الثيم الفاتح)
+                  //  استخدام primaryColor كخلفية للزر (سيكون داكناً في الثيم الفاتح)
                   backgroundColor: primaryColor,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -262,13 +272,16 @@ class _ProductDetailViewState extends State<ProductDetailView> {
                 ),
                 child: Row(
                   children: [
-                    // 💡 استخدام لون يتناقض مع primaryColor (يجب أن يكون اللون المعكوس)
-                    Icon(Icons.shopping_cart, color: Theme.of(context).colorScheme.onPrimary),
+                    //  استخدام لون يتناقض مع primaryColor (يجب أن يكون اللون المعكوس)
+                    Icon(Icons.shopping_cart, 
+                      key: _cartIconKey, // 🚨 المفتاح الجديد
+                      color: Theme.of(context).colorScheme.onPrimary,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       "Add to Cart",
                       style: _getTenorSansStyle(context, 16, weight: FontWeight.w600)
-                              // 💡 استخدام لون يتناقض مع primaryColor
+                              //  استخدام لون يتناقض مع primaryColor
                               .copyWith(color: Theme.of(context).colorScheme.onPrimary),
                     ),
                   ],
@@ -318,25 +331,25 @@ class _ProductDetailViewState extends State<ProductDetailView> {
   // MARK: - Main Build Method
   @override
   Widget build(BuildContext context) {
-    // 💡 جلب الألوان الأساسية هنا
+    //  جلب الألوان الأساسية هنا
     final Color scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
     final Color primaryColor = Theme.of(context).colorScheme.primary; 
     final Color secondaryColor = Theme.of(context).colorScheme.onSurface; 
     final Color greenColor = Colors.green.shade700; // اللون الأخضر للمنتج يبقى ثابتًا
 
     return Scaffold(
-      // 💡 استخدام scaffoldColor
+      //  استخدام scaffoldColor
       backgroundColor: scaffoldColor,
       appBar: AppBar(
         title: Text("Product Details", style: TextStyle(color: primaryColor)),
         centerTitle: true,
-        // 💡 استخدام لون خلفية AppBar الديناميكي
+        //  استخدام لون خلفية AppBar الديناميكي
         backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
         automaticallyImplyLeading: false, 
         
         // تعيين زر المراسلة في أقصى اليسار (Leading)
         leading: IconButton( 
-            icon: Icon(Icons.message, color: primaryColor), // 💡 استخدام primaryColor
+            icon: Icon(Icons.message, color: primaryColor), //  استخدام primaryColor
             onPressed: _startChat,
         ),
         
@@ -344,7 +357,7 @@ class _ProductDetailViewState extends State<ProductDetailView> {
         actions: [
           // زر الإغلاق (xmark)
           IconButton(
-            icon: Icon(Icons.close, color: primaryColor), // 💡 استخدام primaryColor
+            icon: Icon(Icons.close, color: primaryColor), //  استخدام primaryColor
             onPressed: () => Navigator.of(context).pop(),
           ),
         ],
@@ -363,8 +376,8 @@ class _ProductDetailViewState extends State<ProductDetailView> {
                   child: CachedNetworkImage(
                     imageUrl: widget.product.imageUrl,
                     fit: BoxFit.cover,
-                    placeholder: (context, url) => Center(child: CircularProgressIndicator(color: secondaryColor)), // 💡 استخدام secondaryColor
-                    errorWidget: (context, url, error) => Center(child: Icon(Icons.image_not_supported, color: secondaryColor)), // 💡 استخدام secondaryColor
+                    placeholder: (context, url) => Center(child: CircularProgressIndicator(color: secondaryColor)), //  استخدام secondaryColor
+                    errorWidget: (context, url, error) => Center(child: Icon(Icons.image_not_supported, color: secondaryColor)), //  استخدام secondaryColor
                   ),
                 ),
                 
@@ -378,7 +391,7 @@ class _ProductDetailViewState extends State<ProductDetailView> {
                         children: [
                           Text(
                             widget.product.name,
-                            style: _getTenorSansStyle(context, 24), // 💡 تمرير context
+                            style: _getTenorSansStyle(context, 24), //  تمرير context
                           ),
                           const SizedBox(height: 12),
                           Text(
@@ -395,7 +408,7 @@ class _ProductDetailViewState extends State<ProductDetailView> {
                           thickness: 1, 
                           indent: MediaQuery.of(context).size.width * 0.3,
                           endIndent: MediaQuery.of(context).size.width * 0.3,
-                          color: secondaryColor.withOpacity(0.3), // 💡 استخدام secondaryColor
+                          color: secondaryColor.withOpacity(0.3), //  استخدام secondaryColor
                         ),
                       ),
                       
@@ -406,7 +419,7 @@ class _ProductDetailViewState extends State<ProductDetailView> {
                         padding: const EdgeInsets.symmetric(horizontal: 30),
                         child: Text(
                           widget.product.description,
-                          // 💡 استخدام secondaryColor
+                          //  استخدام secondaryColor
                           style: _getTenorSansStyle(context, 16).copyWith(color: secondaryColor), 
                           textAlign: TextAlign.center,
                         ),
@@ -415,12 +428,12 @@ class _ProductDetailViewState extends State<ProductDetailView> {
                       const SizedBox(height: 30),
                       
                       // Quantity Selector
-                      _buildQuantitySelector(context), // 💡 تمرير context
+                      _buildQuantitySelector(context), //  تمرير context
                       
                       const SizedBox(height: 20),
                       
                       // Store Info
-                      _buildStoreInfo(context), // 💡 تمرير context
+                      _buildStoreInfo(context), //  تمرير context
                       
                       // مساحة إضافية لتجنب تداخل شريط السلة الثابت
                       const SizedBox(height: 100), 
@@ -438,6 +451,185 @@ class _ProductDetailViewState extends State<ProductDetailView> {
           ),
         ],
       ),
+    );
+  }
+}
+
+
+
+// Widget مخصص لعرض إشعار "تمت الإضافة إلى السلة"
+//  Widget الإشعار المخصص مع الأنيميشن
+
+class FocusTransitionOverlay extends StatefulWidget {
+  final String productName;
+  final Offset startPosition;
+  final Size startSize;
+  final Offset endPosition; // End position is center of screen
+  final VoidCallback onDismiss;
+  final TextStyle Function(BuildContext, double, {FontWeight weight, Color? color}) getTenorSansStyle;
+
+  const FocusTransitionOverlay({
+    Key? key,
+    required this.productName,
+    required this.startPosition,
+    required this.startSize,
+    required this.endPosition,
+    required this.onDismiss,
+    required this.getTenorSansStyle,
+  }) : super(key: key);
+
+  @override
+  State<FocusTransitionOverlay> createState() => _FocusTransitionOverlayState();
+}
+
+class _FocusTransitionOverlayState extends State<FocusTransitionOverlay> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<Offset> _positionAnimation;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _textOpacityAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    
+    // 1. 🚨 المدة الكلية أصبحت 3 ثوانٍ (كافية للحركة + القراءة + الاختفاء)
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2500), // 3 ثواني للعرض الكلي
+    );
+
+    final double finalNotificationWidth = 250; 
+    final double finalNotificationHeight = 50; 
+    
+    final Offset startOffset = widget.startPosition + Offset(widget.startSize.width / 2, widget.startSize.height / 2);
+    final Offset endOffset = widget.endPosition - Offset(finalNotificationWidth / 2, finalNotificationHeight / 2);
+    
+    // الحركة ستتم خلال أول 30% من المدة (3000ms * 0.3 = 900ms)
+    const double entryEndInterval = 0.3; 
+    
+    // 1. أنيميشن الموقع (حركة سريعة في أول 900ms)
+    _positionAnimation = Tween<Offset>(
+      begin: startOffset,
+      end: endOffset,
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.0, entryEndInterval, curve: Curves.easeOutCubic), 
+    ));
+
+    // 2. أنيميشن التحول (Scale)
+    _scaleAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween<double>(begin: 0.8, end: 1.1), weight: 60),
+      TweenSequenceItem(tween: Tween<double>(begin: 1.1, end: 1.0), weight: 40),
+    ]).animate(
+      CurvedAnimation(parent: _controller, curve: const Interval(0.0, entryEndInterval, curve: Curves.decelerate)),
+    );
+    
+    // 3. 🚨 أنيميشن ظهور النص (يظهر بسرعة في نهاية الحركة)
+    _textOpacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: const Interval(0.2, entryEndInterval, curve: Curves.easeIn)), // يكتمل ظهوره عند 900ms
+    );
+    
+    // 4. 🚨 أنيميشن الـ Fade (يبدأ في آخر 20% من المدة)
+    const double fadeStartInterval = 0.8; // يبدأ الاختفاء عند 3000ms * 0.8 = 2400ms (بعد 1.5 ثانية من الثبات)
+    _fadeAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
+      CurvedAnimation(parent: _controller, curve: const Interval(fadeStartInterval, 1.0, curve: Curves.easeOut)),
+    );
+
+    // ابدأ الأنيميشن، وعندما ينتهي (بعد 3 ثوانٍ)، قم بالإزالة
+    _controller.forward().then((_) {
+      widget.onDismiss();
+    });
+
+    // 🛑 تم حذف الـ Future.delayed السابق، لأن الـ controller هو من يتحكم بالمدة الآن
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const Color elegantGreen = Color(0xFF8BC34A); 
+    
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Positioned(
+          left: _positionAnimation.value.dx,
+          top: _positionAnimation.value.dy,
+          child: Opacity(
+            opacity: _fadeAnimation.value,
+            child: Transform.scale(
+              scale: _scaleAnimation.value, 
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                decoration: BoxDecoration(
+                  color: Colors.black87, 
+                  borderRadius: BorderRadius.circular(30.0), 
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.4),
+                      blurRadius: 10,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _controller.value < 0.3 ? Icons.shopping_cart : Icons.check_circle_rounded, // التحول عند انتهاء الحركة
+                      color: elegantGreen, 
+                      size: 28,
+                    ),
+                    const SizedBox(width: 12),
+                    // النص يظهر تدريجياً
+                    Opacity(
+                      opacity: _textOpacityAnimation.value,
+                      // 🚨 استخدام الـ RichText لفصل الألوان والخطوط
+                      child: RichText(
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        text: TextSpan(
+                          // 💡 اللون المستخدم لـ "Added" هو الأبيض (اللون الافتراضي)
+                          style: widget.getTenorSansStyle(context, 16).copyWith(
+                            color: Colors.white, 
+                            fontWeight: FontWeight.w400, // أرق قليلاً لتقليل التكتل
+                            decoration: TextDecoration.none, 
+                          ),
+                          children: [
+                            // 1. اسم المنتج (بلون أخضر هادئ وأكثر جرأة)
+                            TextSpan(
+                              text: widget.productName,
+                              style: widget.getTenorSansStyle(context, 16).copyWith(
+                                color: Color(0xFF8BC34A), // Elegant Green
+                                fontWeight: FontWeight.w700, // غامق ليبرز
+                                decoration: TextDecoration.none,
+                              ),
+                            ),
+                            // 2. كلمة الإضافة (بلون أبيض تقليدي)
+                            TextSpan(
+                              text: " Added to Cart", 
+                              style: widget.getTenorSansStyle(context, 16).copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w400, // رقيق لتمييز الاسم عنه
+                                decoration: TextDecoration.none,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

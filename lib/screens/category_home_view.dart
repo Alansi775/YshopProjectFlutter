@@ -7,7 +7,7 @@ import '../widgets/custom_form_widgets.dart'; // للوصول إلى primaryText
 import '../widgets/side_menu_view_contents.dart'; 
 //  الإضافة المطلوبة: استيراد ملف سلة المشتريات الجانبية الجاهز
 import '../widgets/side_cart_view_contents.dart'; 
-import '../widgets/order_tracker_widget.dart'; // 💡 استيراد ودجت تتبع الطلب
+import '../widgets/order_tracker_widget.dart'; //  استيراد ودجت تتبع الطلب
 import 'package:provider/provider.dart'; 
 import '../state_management/cart_manager.dart'; 
 
@@ -151,7 +151,7 @@ class _CategoryHomeViewState extends State<CategoryHomeView> {
       drawer: const Drawer(child: SideMenuViewContents()),
       endDrawer: Drawer(child: SideCartViewContents()), 
       
-      // 💡 التعديل الرئيسي: استخدام Stack لوضع OrderTrackerWidget فوق CustomScrollView
+      //  التعديل الرئيسي: استخدام Stack لوضع OrderTrackerWidget فوق CustomScrollView
       body: Stack(
         children: [
           CustomScrollView(
@@ -173,7 +173,7 @@ class _CategoryHomeViewState extends State<CategoryHomeView> {
                 ),
                 // زر سلة المشتريات (Side Cart)
                 actions: [
-                  // ⚠️ سنقلل Padding الخارجي جداً، ونتحمل الاقتطاع الطفيف للحفاظ على الموقع الأصلي
+                  //  سنقلل Padding الخارجي جداً، ونتحمل الاقتطاع الطفيف للحفاظ على الموقع الأصلي
                   Padding(
                     padding: const EdgeInsets.only(right: 5.0), // هامش بسيط لمنع القص الحاد
                     child: Consumer<CartManager>(
@@ -181,7 +181,7 @@ class _CategoryHomeViewState extends State<CategoryHomeView> {
                         final totalItems = cartManager.totalItems;
                         final primaryIconColor = Theme.of(context).colorScheme.onSurface;
                         
-                        // ⭐️ نستخدم InkWell لتغليف الـ Stack بالكامل وجعل المنطقة قابلة للضغط ⭐️
+                        //  نستخدم InkWell لتغليف الـ Stack بالكامل وجعل المنطقة قابلة للضغط 
                         return InkWell(
                           onTap: () => Scaffold.of(context).openEndDrawer(), 
                           borderRadius: BorderRadius.circular(100), 
@@ -256,7 +256,7 @@ class _CategoryHomeViewState extends State<CategoryHomeView> {
             ],
           ),
           
-          // 💡 إضافة مؤشر تتبع الطلب هنا
+          //  إضافة مؤشر تتبع الطلب هنا
           // سيتم وضعه فوق كل من CustomScrollView و SliverAppBar 
           const OrderTrackerWidget(), 
         ],

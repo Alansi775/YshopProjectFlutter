@@ -70,7 +70,7 @@ class _StoresListViewState extends State<StoresListView> {
   // MARK: - Widgets
 
   Widget _buildLoadingIndicator(BuildContext context) {
-    // 💡 جلب لون التمييز الديناميكي
+    //  جلب لون التمييز الديناميكي
     final Color accentColor = Theme.of(context).colorScheme.secondary; 
 
     return Positioned.fill(
@@ -87,7 +87,7 @@ class _StoresListViewState extends State<StoresListView> {
   }
 
   Widget _buildEmptyStateView(BuildContext context) {
-    // 💡 جلب الألوان الديناميكية
+    //  جلب الألوان الديناميكية
     final Color primaryColor = Theme.of(context).colorScheme.primary; 
     final Color secondaryColor = Theme.of(context).colorScheme.onSurface.withOpacity(0.6); 
 
@@ -129,7 +129,7 @@ class _StoresListViewState extends State<StoresListView> {
     );
   }
 
-  // 💡 التعديل: إضافة الدالة المساعدة المفقودة _buildWebContainer
+  //  التعديل: إضافة الدالة المساعدة المفقودة _buildWebContainer
   Widget _buildWebContainer({required Widget child}) {
     if (MediaQuery.of(context).size.width > 600) {
       return Center(
@@ -147,7 +147,7 @@ class _StoresListViewState extends State<StoresListView> {
   // MARK: - Main Build Method
   @override
   Widget build(BuildContext context) {
-    // 💡 جلب الألوان الأساسية هنا
+    //  جلب الألوان الأساسية هنا
     final Color primaryColor = Theme.of(context).colorScheme.primary; 
     final Color scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
     
@@ -181,7 +181,7 @@ class _StoresListViewState extends State<StoresListView> {
 
         // أيقونة السلة (Actions) لليمين
         actions: [
-                  // ⚠️ سنقلل Padding الخارجي جداً، ونتحمل الاقتطاع الطفيف للحفاظ على الموقع الأصلي
+                  //  سنقلل Padding الخارجي جداً، ونتحمل الاقتطاع الطفيف للحفاظ على الموقع الأصلي
                   Padding(
                     padding: const EdgeInsets.only(right: 5.0), // هامش بسيط لمنع القص الحاد
                     child: Consumer<CartManager>(
@@ -189,7 +189,7 @@ class _StoresListViewState extends State<StoresListView> {
                         final totalItems = cartManager.totalItems;
                         final primaryIconColor = Theme.of(context).colorScheme.onSurface;
                         
-                        // ⭐️ نستخدم InkWell لتغليف الـ Stack بالكامل وجعل المنطقة قابلة للضغط ⭐️
+                        //  نستخدم InkWell لتغليف الـ Stack بالكامل وجعل المنطقة قابلة للضغط 
                         return InkWell(
                           onTap: () => Scaffold.of(context).openEndDrawer(), 
                           borderRadius: BorderRadius.circular(100), 
@@ -245,7 +245,7 @@ class _StoresListViewState extends State<StoresListView> {
             child: Column(
               children: [
                 // Content Header & Grid
-                _buildWebContainer( // 💡 الآن الدالة معرّفة ولن يحدث خطأ
+                _buildWebContainer( //  الآن الدالة معرّفة ولن يحدث خطأ
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -297,9 +297,16 @@ class _StoresListViewState extends State<StoresListView> {
                                 store: store,
                                 onTap: () {
                                   Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (context) => StoreDetailView(store: store),
-                                    ),
+                                    PageRouteBuilder(
+                                      pageBuilder: (context, animation, secondaryAnimation) => StoreDetailView(store: store),
+                                      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                                        return FadeTransition(
+                                          opacity: animation.drive(Tween(begin: 0.0, end: 1.0)),
+                                          child: child,
+                                        );
+                                      },
+                                      transitionDuration: const Duration(milliseconds: 200),
+                                    )
                                   );
                                 },
                               );

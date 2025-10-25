@@ -10,20 +10,20 @@ import 'cart_item_widget.dart';
 class SideCartViewContents extends StatelessWidget {
   const SideCartViewContents({Key? key}) : super(key: key); 
 
-  // 💡 تم تعديل الدالة لتقبل context وتستخدم primaryColor افتراضيًا
+  //  تم تعديل الدالة لتقبل context وتستخدم primaryColor افتراضيًا
   TextStyle _getTenorSansStyle(BuildContext context, double size, {FontWeight weight = FontWeight.normal, Color? color}) {
     final Color primaryColor = Theme.of(context).colorScheme.primary; 
     return TextStyle(
       fontFamily: 'TenorSans', 
       fontSize: size,
       fontWeight: weight,
-      color: color ?? primaryColor, // 💡 استخدام primaryColor افتراضيًا
+      color: color ?? primaryColor, //  استخدام primaryColor افتراضيًا
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    // 💡 جلب الألوان الأساسية هنا
+    //  جلب الألوان الأساسية هنا
     final Color primaryColor = Theme.of(context).colorScheme.primary;
     final Color scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
 
@@ -33,22 +33,22 @@ class SideCartViewContents extends StatelessWidget {
         final totalAmount = cartManager.totalAmount;
 
         return Scaffold(
-          // 💡 استخدام scaffoldColor
+          //  استخدام scaffoldColor
           backgroundColor: scaffoldColor,
           appBar: AppBar(
-            // 💡 استخدام لون خلفية AppBar الديناميكي
+            //  استخدام لون خلفية AppBar الديناميكي
             backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
-            // 💡 استخدام primaryColor للأيقونات والتكست
+            //  استخدام primaryColor للأيقونات والتكست
             foregroundColor: primaryColor,
             title: Text(
               "Shopping Cart (${cartManager.totalItems})",
-              style: _getTenorSansStyle(context, 18), // 💡 تمرير context
+              style: _getTenorSansStyle(context, 18), //  تمرير context
             ),
             centerTitle: true,
             automaticallyImplyLeading: false, 
             actions: [
               IconButton(
-                // 💡 استخدام primaryColor
+                //  استخدام primaryColor
                 icon: Icon(Icons.close, color: primaryColor),
                 onPressed: () => Navigator.pop(context), 
               ),
@@ -79,7 +79,7 @@ class SideCartViewContents extends StatelessWidget {
   }
   
   Widget _buildEmptyState(BuildContext context) {
-    // 💡 جلب الألوان الديناميكية
+    //  جلب الألوان الديناميكية
     final Color primaryColor = Theme.of(context).colorScheme.primary; 
     final Color secondaryColor = Theme.of(context).colorScheme.onSurface;
 
@@ -89,17 +89,17 @@ class SideCartViewContents extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // 💡 استخدام secondaryColor
+            //  استخدام secondaryColor
             Icon(Icons.shopping_cart_outlined, size: 80, color: secondaryColor.withOpacity(0.5)),
             const SizedBox(height: 20),
             Text(
               "Your cart is empty.",
-              style: _getTenorSansStyle(context, 20), // 💡 تمرير context
+              style: _getTenorSansStyle(context, 20), //  تمرير context
             ),
             const SizedBox(height: 10),
             Text(
               "Add items to your cart to see them here.",
-              // 💡 استخدام secondaryColor
+              //  استخدام secondaryColor
               style: _getTenorSansStyle(context, 16).copyWith(color: secondaryColor.withOpacity(0.7)),
               textAlign: TextAlign.center,
             ),
@@ -111,7 +111,7 @@ class SideCartViewContents extends StatelessWidget {
 
   // دالة بناء الشريط السفلي لعملية الدفع
   Widget _buildCheckoutBottomBar(BuildContext context, double totalAmount) {
-    // 💡 جلب الألوان الديناميكية
+    //  جلب الألوان الديناميكية
     final Color primaryColor = Theme.of(context).colorScheme.primary; 
     final Color secondaryColor = Theme.of(context).colorScheme.onSurface;
     final Color cardColor = Theme.of(context).cardColor;
@@ -125,10 +125,10 @@ class SideCartViewContents extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        // 💡 استخدام cardColor
+        //  استخدام cardColor
         color: cardColor,
         boxShadow: [
-          // 💡 استخدام primaryColor للظل (بشفافية عالية لتجنب الظل القوي في الثيم الداكن)
+          //  استخدام primaryColor للظل (بشفافية عالية لتجنب الظل القوي في الثيم الداكن)
           BoxShadow(color: primaryColor.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5)), 
         ],
       ),
@@ -146,7 +146,7 @@ class SideCartViewContents extends StatelessWidget {
                 children: [
                   Text(
                     "Total",
-                    // 💡 استخدام secondaryColor
+                    //  استخدام secondaryColor
                     style: _getTenorSansStyle(context, 16).copyWith(color: secondaryColor.withOpacity(0.7)),
                   ),
                   Text(
@@ -169,7 +169,7 @@ class SideCartViewContents extends StatelessWidget {
                 );
               },
               style: ElevatedButton.styleFrom(
-                // 💡 استخدام primaryColor كخلفية للزر
+                //  استخدام primaryColor كخلفية للزر
                 backgroundColor: primaryColor,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -180,7 +180,7 @@ class SideCartViewContents extends StatelessWidget {
               child: Text(
                 "Checkout",
                 style: _getTenorSansStyle(context, 18, weight: FontWeight.w600)
-                    // 💡 استخدام اللون المعاكس لـ primaryColor (المناسب للنص داخل الزر)
+                    //  استخدام اللون المعاكس لـ primaryColor (المناسب للنص داخل الزر)
                     .copyWith(color: Theme.of(context).colorScheme.onPrimary),
               ),
             ),
