@@ -4,21 +4,22 @@ import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart'; 
 
 import 'firebase_options.dart'; 
-import 'screens/sign_in_view.dart'; 
-import 'screens/category_home_view.dart'; // ستبقى مستوردة
+import 'screens/auth/sign_in_view.dart'; 
+import 'screens/admin/admin_home_view.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'widgets/order_tracker_widget.dart';
+import 'services/navigation_service.dart';
 
-//  التأكد من وجود هذه الملفات في مسار 'lib/state_management/'
 import 'state_management/cart_manager.dart'; 
 import 'state_management/auth_manager.dart'; 
 import 'state_management/theme_manager.dart'; 
 
 // =======================================================
 // MARK: - تعريفات الثيم (Themes Definitions)
-// ... (لا تغيير في تعريفات الثيم)
 // =======================================================
 
 final _lightThemeData = ThemeData(
-  // ... (تعريفات الثيم)
+  brightness: Brightness.light,
   scaffoldBackgroundColor: Colors.white, 
   primaryColor: Colors.black,
   colorScheme: ColorScheme.light(
@@ -45,7 +46,6 @@ final _lightThemeData = ThemeData(
 );
 
 final _darkThemeData = ThemeData(
-  // ... (تعريفات الثيم)
   brightness: Brightness.dark,
   scaffoldBackgroundColor: Colors.grey[900], 
   primaryColor: Colors.white, 
@@ -63,7 +63,7 @@ final _darkThemeData = ThemeData(
     elevation: 0, 
     centerTitle: true,
     iconTheme: const IconThemeData(color: Colors.white), 
-    titleTextStyle: TextStyle(
+    titleTextStyle: const TextStyle(
       color: Colors.white, 
       fontSize: 20, 
       fontWeight: FontWeight.bold,
@@ -75,12 +75,10 @@ final _darkThemeData = ThemeData(
 
 // =======================================================
 // MARK: - الدالة الرئيسية (main)
-// ... (لا تغيير في دالة main)
 // =======================================================
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
   
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
@@ -108,33 +106,67 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final themeManager = Provider.of<ThemeManager>(context); 
-    
-    return MaterialApp(
-      title: 'YSHOP',
-      
-      theme: _lightThemeData, 
-      darkTheme: _darkThemeData,
-      themeMode: themeManager.themeMode,
-      
-      debugShowCheckedModeBanner: false, 
-      
-      //  التعديل الحاسم هنا!
-      home: StreamBuilder<User?>(
-        stream: FirebaseAuth.instance.authStateChanges(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
+    //  استخدام Consumer للاستماع للتغييرات تلقائياً
+    return Consumer<ThemeManager>(
+      builder: (context, themeManager, child) {
+        debugPrint('🎨 Theme updated: ${themeManager.themeMode}');
+        
+        return MaterialApp(
+          navigatorKey: NavigationService.navigatorKey,
+          title: 'YSHOP',
+          theme: _lightThemeData, 
+          darkTheme: _darkThemeData,
+          themeMode: themeManager.themeMode, //  يتحدث تلقائياً
+
+          debugShowCheckedModeBanner: false, 
+
+          // Wrap navigator content with a builder so we can overlay the global OrderTrackerWidget
+          builder: (context, child) {
+            return Stack(
+              children: [
+                // The app's normal content (Navigator)
+                if (child != null) child,
+                // Global persistent order tracker overlay
+                const OrderTrackerWidget(),
+              ],
             );
-          }
-          
-          // سواء كان المستخدم مسجلاً دخوله (hasData) أو غير مسجل،
-          // نبدأ دائماً من شاشة تسجيل الدخول (SignInView).
-          // وظيفة SignInView.initState -> _checkAuthState هي تحديد الوجهة الصحيحة.
-          return const SignInView();
-        },
-      ),
+          },
+
+          home: FutureBuilder<SharedPreferences?>(
+            future: SharedPreferences.getInstance().then((p) => p),
+            builder: (context, prefSnap) {
+              if (prefSnap.connectionState == ConnectionState.waiting) {
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
+              }
+              final prefs = prefSnap.data;
+              try {
+                final token = prefs?.getString('admin_token');
+                final expiryMs = prefs?.getInt('admin_token_expiry');
+                if (token != null && expiryMs != null) {
+                  final expiry = DateTime.fromMillisecondsSinceEpoch(expiryMs);
+                  if (DateTime.now().isBefore(expiry)) {
+                    return const AdminHomeView();
+                  }
+                }
+              } catch (_) {}
+
+              return StreamBuilder<User?>(
+                stream: FirebaseAuth.instance.authStateChanges(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Scaffold(
+                      body: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+                  return const SignInView();
+                },
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }

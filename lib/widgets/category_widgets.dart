@@ -1,7 +1,7 @@
 // lib/widgets/category_widgets.dart (الكود المصحح والنهائي)
 
 import 'package:flutter/material.dart';
-import '../screens/stores_list_view.dart'; 
+import '../screens/customers/stores_list_view.dart'; 
 
 // -------------------------------------------------------------
 // MARK: - Category Mappings (تبقى ثابتة)

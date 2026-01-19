@@ -68,27 +68,73 @@ class _StoreCardState extends State<StoreCard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Image
-                ClipRRect(
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(16),
-                    topRight: Radius.circular(16),
-                  ),
-                  child: CachedNetworkImage(
-                    imageUrl: widget.store.storeIconUrl,
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    height: 160,
-                    placeholder: (context, url) => _buildImagePlaceholder(),
-                    errorWidget: (context, url, error) => Container(
+                // Image with Circular Icon Overlay
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Background Gradient
+                    Container(
+                      width: double.infinity,
                       height: 160,
-                      color: Colors.grey.shade200,
-                      //  التعديل 1: إزالة 'const' واستخدام secondaryColor
-                      child: Center(
-                        child: Icon(Icons.image_not_supported, color: secondaryColor),
+                      decoration: BoxDecoration(
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(16),
+                          topRight: Radius.circular(16),
+                        ),
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            primaryColor.withOpacity(0.15),
+                            primaryColor.withOpacity(0.05),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
+                    
+                    // Circular Icon Badge (Center)
+                    Container(
+                      width: 90,
+                      height: 90,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.4),
+                          width: 2.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.15),
+                            blurRadius: 12,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: widget.store.storeIconUrl.isEmpty
+                          ? Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: primaryColor.withOpacity(0.15),
+                              ),
+                              child: Icon(Icons.store, size: 45, color: primaryColor),
+                            )
+                          : ClipOval(
+                              child: CachedNetworkImage(
+                                imageUrl: widget.store.storeIconUrl,
+                                width: 90,
+                                height: 90,
+                                fit: BoxFit.cover,
+                                placeholder: (context, url) => Container(
+                                  color: primaryColor.withOpacity(0.1),
+                                ),
+                                errorWidget: (context, url, error) => Container(
+                                  color: primaryColor.withOpacity(0.1),
+                                  child: Icon(Icons.store, size: 45, color: primaryColor),
+                                ),
+                              ),
+                            ),
+                    ),
+                  ],
                 ),
 
                 // Store Info

@@ -4,6 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import '../models/cart_item_model.dart';
+import '../models/currency.dart';
+
+// دالة للحصول على رمز العملة الصحيح
+String getCurrencySymbol(String? currencyCode) {
+  if (currencyCode == null || currencyCode.isEmpty) return '₺'; // Default to TRY
+  final currency = Currency.fromCode(currencyCode);
+  return currency?.symbol ?? '₺'; // Fallback to TRY symbol
+}
 
 class CheckoutItemWidget extends StatelessWidget {
   final CartItemModel item;
@@ -27,7 +35,7 @@ class CheckoutItemWidget extends StatelessWidget {
     final Color secondaryColor = Theme.of(context).colorScheme.onSurface;
     
     // تنسيق السعر لعرضه بشكل فردي
-    final String priceFormatted = NumberFormat.currency(symbol: '\$').format(item.product.price);
+    final String priceFormatted = '${getCurrencySymbol(item.product.currency)}${item.product.price.toStringAsFixed(2)}';
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12.0),

@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_auth/firebase_auth.dart'; 
-import 'package:cloud_firestore/cloud_firestore.dart';
-import '../screens/settings_view.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../services/api_service.dart';
+import '../screens/customers/settings_view.dart';
 // يجب استيراد شاشة تسجيل الدخول لاستخدامها في التوجيه
-import '../screens/sign_in_view.dart'; 
-import '../state_management/auth_manager.dart'; 
+import '../screens/auth/sign_in_view.dart'; 
+import '../state_management/auth_manager.dart';
+import '../state_management/cart_manager.dart'; 
 
 // دالة مساعدة لخط "TenorSans" (مُعدّلة لاستخدام لون النص من الـ Theme عند عدم تحديد لون)
 TextStyle _getTenorSansStyle(double size, {FontWeight weight = FontWeight.normal, Color? color, required BuildContext context}) {
@@ -44,38 +45,45 @@ class _SideMenuViewContentsState extends State<SideMenuViewContents> {
     if (user == _lastCheckedUser && user != null) return;
     _lastCheckedUser = user;
 
-    if (user != null) {
-      try {
-        DocumentSnapshot userData = await FirebaseFirestore.instance
-            .collection('customers')
-            .doc(user.uid)
-            .get();
+    if (user == null) {
+      if (mounted) setState(() { _name = 'Guest'; _surname = 'User'; });
+      return;
+    }
 
-        if (userData.exists && mounted) {
-          setState(() {
-            _name = userData['name'] as String? ?? "User";
-            _surname = userData['surname'] as String? ?? "";
-          });
-        } else if (mounted) {
-           setState(() {
-            _name = user.displayName?.split(' ').first ?? user.email?.split('@').first ?? "User";
-            _surname = user.displayName?.split(' ').last ?? "";
-          });
+    try {
+      final profile = await ApiService.getUserProfile();
+      if (profile != null && mounted) {
+        final display = (profile['display_name'] as String?) ?? (profile['displayName'] as String?) ?? '';
+        String first = '';
+        String last = '';
+        if (display.isNotEmpty) {
+          final parts = display.split(' ');
+          first = parts.first;
+          last = parts.length > 1 ? parts.sublist(1).join(' ') : '';
         }
-      } catch (e) {
-        if (mounted) {
-           setState(() {
-            _name = "Error";
-            _surname = "Loading";
-          });
+        setState(() {
+          _name = (profile['name'] as String?) ?? (first.isNotEmpty ? first : (user.displayName?.split(' ').first ?? user.email?.split('@').first ?? 'User'));
+          _surname = (profile['surname'] as String?) ?? last;
+        });
+      } else {
+        // backend missing profile — try syncing basic info from Firebase Auth
+        try {
+          await ApiService.syncUser(uid: user.uid, email: user.email ?? '', displayName: user.displayName ?? '');
+          final profile2 = await ApiService.getUserProfile();
+          if (profile2 != null && mounted) {
+            final display = (profile2['display_name'] as String?) ?? (profile2['displayName'] as String?) ?? '';
+            final parts = display.split(' ');
+            setState(() {
+              _name = parts.isNotEmpty ? parts.first : (user.displayName?.split(' ').first ?? user.email?.split('@').first ?? 'User');
+              _surname = parts.length > 1 ? parts.sublist(1).join(' ') : '';
+            });
+          }
+        } catch (e) {
+          if (mounted) setState(() { _name = user.displayName?.split(' ').first ?? user.email?.split('@').first ?? 'User'; _surname = user.displayName?.split(' ').last ?? ''; });
         }
-        print("Error fetching user data: $e");
       }
-    } else if (mounted) {
-       setState(() {
-            _name = "Guest";
-            _surname = "User";
-          });
+    } catch (e) {
+      if (mounted) setState(() { _name = user.displayName?.split(' ').first ?? user.email?.split('@').first ?? 'User'; _surname = user.displayName?.split(' ').last ?? ''; });
     }
   }
 
@@ -111,22 +119,25 @@ class _SideMenuViewContentsState extends State<SideMenuViewContents> {
           child: Icon(Icons.person_rounded, size: 30, color: defaultTextColor.withOpacity(0.7)), 
         ),
         const SizedBox(width: 16),
-        VStack(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              isLoggedIn ? '$_name $_surname' : 'Welcome Guest',
-              //  تحديث: تمرير context إلى الدالة
-              style: _getTenorSansStyle(16, weight: FontWeight.w600, context: context),
-              overflow: TextOverflow.ellipsis, 
-            ),
-            const SizedBox(height: 4),
-            Text(
-              isLoggedIn ? 'Account Settings' : 'Sign In / Register',
-              //  تحديث: تمرير context إلى الدالة
-              style: _getTenorSansStyle(12, color: Colors.grey, context: context),
-            ),
-          ],
+        Expanded(
+          child: VStack(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                isLoggedIn ? '$_name $_surname' : 'Welcome Guest',
+                style: _getTenorSansStyle(16, weight: FontWeight.w600, context: context),
+                softWrap: true,
+                maxLines: 3,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                isLoggedIn ? 'Account Settings' : 'Sign In / Register',
+                style: _getTenorSansStyle(12, color: Colors.grey, context: context),
+                softWrap: true,
+                maxLines: 2,
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -324,6 +335,10 @@ class _SideMenuViewContentsState extends State<SideMenuViewContents> {
             TextButton(
               onPressed: () async {
                 if (isLoggedIn) {
+                  //  Clear cart manager before logout
+                  final cartManager = context.read<CartManager>();
+                  await cartManager.clearCart();
+                  
                   await authManager.signOut();
                   
                   if (mounted) {

@@ -14,6 +14,8 @@ class UnderlinedTextField extends StatelessWidget {
   final TextInputType keyboardType;
   final bool isPassword;
   final ValueChanged<String>? onSubmitted;
+  final bool readOnly;
+  final VoidCallback? onTap;
 
   const UnderlinedTextField({
     Key? key,
@@ -22,6 +24,8 @@ class UnderlinedTextField extends StatelessWidget {
     this.keyboardType = TextInputType.text,
     this.isPassword = false,
     this.onSubmitted,
+    this.readOnly = false,
+    this.onTap,
   }) : super(key: key);
 
   @override
@@ -60,6 +64,8 @@ class UnderlinedTextField extends StatelessWidget {
             controller: controller,
             obscureText: isPassword,
             keyboardType: keyboardType,
+            readOnly: readOnly,
+            onTap: onTap,
             //  التعديل الحاسم: تعيين لون الكتابة (style) ليعتمد على الثيم
             style: TextStyle(
               color: primaryColor, // سيصبح أبيض في الوضع الداكن
@@ -92,10 +98,10 @@ class UnderlinedTextField extends StatelessWidget {
 
 // MARK: - UnderlinedSecureField
 // هذا لا يحتاج إلى تعديل لأنه يستخدم UnderlinedTextField
-class UnderlinedSecureField extends StatelessWidget {
+class UnderlinedSecureField extends StatefulWidget {
   final String placeholder;
   final TextEditingController controller;
-  final ValueChanged<String>? onSubmitted; 
+  final ValueChanged<String>? onSubmitted;
 
   const UnderlinedSecureField({
     Key? key,
@@ -105,13 +111,63 @@ class UnderlinedSecureField extends StatelessWidget {
   }) : super(key: key);
 
   @override
+  State<UnderlinedSecureField> createState() => _UnderlinedSecureFieldState();
+}
+
+class _UnderlinedSecureFieldState extends State<UnderlinedSecureField> {
+  bool _obscure = true;
+
+  @override
   Widget build(BuildContext context) {
-    return UnderlinedTextField(
-      placeholder: placeholder,
-      controller: controller,
-      isPassword: true,
-      keyboardType: TextInputType.visiblePassword,
-      onSubmitted: onSubmitted,
+    final Color primaryColor = Theme.of(context).colorScheme.primary;
+    final Color secondaryColor = Theme.of(context).colorScheme.onSurface.withOpacity(0.6);
+    final Color dividerColor = Theme.of(context).dividerColor;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          widget.placeholder,
+          style: TextStyle(
+            fontSize: 12,
+            color: secondaryColor,
+          ),
+        ),
+        const SizedBox(height: 6),
+        TextField(
+          controller: widget.controller,
+          obscureText: _obscure,
+          keyboardType: TextInputType.visiblePassword,
+          style: TextStyle(
+            color: primaryColor,
+            fontSize: 16,
+          ),
+          textCapitalization: TextCapitalization.none,
+          textInputAction: widget.onSubmitted != null ? TextInputAction.go : TextInputAction.next,
+          onSubmitted: widget.onSubmitted,
+          decoration: InputDecoration(
+            isDense: true,
+            contentPadding: EdgeInsets.zero,
+            border: InputBorder.none,
+            suffixIcon: IconButton(
+              icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
+              color: secondaryColor,
+              onPressed: () {
+                setState(() {
+                  _obscure = !_obscure;
+                });
+              },
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 8.0),
+          child: Divider(
+            height: 1,
+            color: dividerColor,
+          ),
+        ),
+      ],
     );
   }
 }

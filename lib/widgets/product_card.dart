@@ -3,8 +3,16 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/product.dart';
+import '../models/currency.dart';
 import './custom_form_widgets.dart'; // للوصول إلى primaryText و secondaryText
 import './shimmer_effect.dart'; // لتأثير Shimmer أثناء التحميل
+
+// دالة للحصول على رمز العملة الصحيح
+String getCurrencySymbol(String? currencyCode) {
+  if (currencyCode == null || currencyCode.isEmpty) return '';
+  final currency = Currency.fromCode(currencyCode);
+  return currency?.symbol ?? '';
+}
 
 class ProductCard extends StatelessWidget {
   final Product product;
@@ -44,23 +52,25 @@ class ProductCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image
+            // Image with Elegant Container
             ClipRRect(
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(15),
                 topRight: Radius.circular(15),
               ),
-              child: CachedNetworkImage(
-                imageUrl: product.imageUrl,
-                fit: BoxFit.cover,
+              child: Container(
                 width: double.infinity,
-                height: 120,
-                placeholder: (context, url) => _buildImagePlaceholder(),
-                errorWidget: (context, url, error) => Container(
-                  height: 120,
-                  color: Colors.grey.shade200,
-                  child: const Center(
-                    child: Icon(Icons.shopping_bag_outlined, color: Colors.grey),
+                height: 140,
+                color: Colors.grey.shade50,
+                child: CachedNetworkImage(
+                  imageUrl: product.imageUrl,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => _buildImagePlaceholder(),
+                  errorWidget: (context, url, error) => Container(
+                    color: Colors.grey.shade100,
+                    child: const Center(
+                      child: Icon(Icons.shopping_bag_outlined, color: Colors.grey, size: 40),
+                    ),
                   ),
                 ),
               ),
@@ -84,7 +94,7 @@ class ProductCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 5),
                   Text(
-                    "\$${product.price.toStringAsFixed(2)}", // تنسيق السعر
+                    "${getCurrencySymbol(product.currency)}${product.price.toStringAsFixed(2)}", // تنسيق السعر
                     style: TextStyle(
                       fontSize: 16, 
                       fontWeight: FontWeight.bold,
