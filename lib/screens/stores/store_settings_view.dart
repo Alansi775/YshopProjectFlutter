@@ -4,9 +4,10 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../services/api_service.dart';
+import '../../state_management/auth_manager.dart';
 import '../../widgets/map_picker_sheet.dart';
 import 'package:latlong2/latlong.dart';
 import '../../models/store.dart';
@@ -78,9 +79,7 @@ class _StoreSettingsViewState extends State<StoreSettingsView> {
   Future<void> _fetchStoreData() async {
     setState(() => _isFetching = true);
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) throw Exception("User not logged in");
-
+      // ستحقق من المستخدم عبر ApiService - لا توجد حاجة لـ Firebase
       final storeData = await ApiService.getUserStore();
       if (storeData != null) {
         final store = Store.fromJson(storeData);
@@ -146,7 +145,7 @@ class _StoreSettingsViewState extends State<StoreSettingsView> {
 
       final fileName = 'store_icon_${DateTime.now().millisecondsSinceEpoch}.jpg';
 
-      debugPrint('📤 Uploading icon to: $_baseUrl/stores/$_storeId');
+      debugPrint(' Uploading icon to: $_baseUrl/stores/$_storeId');
 
       //  استخدم الـ Base URL الموحد
       var request = http.MultipartRequest(
@@ -154,13 +153,11 @@ class _StoreSettingsViewState extends State<StoreSettingsView> {
         Uri.parse('$_baseUrl/stores/$_storeId'),
       );
 
-      //  أضف Firebase Token للـ Authentication
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        final token = await user.getIdToken();
-        if (token != null) {
-          request.headers['Authorization'] = 'Bearer $token';
-        }
+      //  أضف JWT Token للـ Authentication من AuthManager
+      final authManager = Provider.of<AuthManager>(context, listen: false);
+      final token = authManager.token;
+      if (token != null) {
+        request.headers['Authorization'] = 'Bearer $token';
       }
 
       request.files.add(
@@ -226,11 +223,9 @@ class _StoreSettingsViewState extends State<StoreSettingsView> {
         _pickedXFile = null;
       });
 
-      // If store exists but has no location, prompt saving location first (no-op here)
-      if ((_latitude == 0.0 && _longitude == 0.0) && _storeId != null) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please set your store location from the map first.')));
-      }
+      // Success!
       if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Store icon saved successfully')));
       }
     } catch (e) {
       debugPrint('❌ Error saving store icon: $e');
@@ -267,52 +262,27 @@ class _StoreSettingsViewState extends State<StoreSettingsView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // If store has no location, require owner to set it first
-                if (_latitude == 0.0 && _longitude == 0.0)
-                  Column(
-                    children: [
-                      _buildStoreIconDisplay(),
-                      const SizedBox(height: 20),
-                      Text(
-                        'Please set your store location before using other features.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 12),
-                      ElevatedButton.icon(
-                        onPressed: _showMapPicker,
-                        icon: const Icon(Icons.map_rounded),
-                        label: const Text('Select on Map'),
-                        style: ElevatedButton.styleFrom(
-                          minimumSize: const Size(double.infinity, 50),
-                          backgroundColor: Colors.orange,
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
-                    ],
-                  )
-                else ...[
-                  // 1. Icon Display
-                  _buildStoreIconDisplay(),
-                  const SizedBox(height: 32),
+                // 1. Icon Display
+                _buildStoreIconDisplay(),
+                const SizedBox(height: 32),
 
-                  // 2. Upload Button
-                  ElevatedButton.icon(
-                    onPressed: _isLoading ? null : _pickImage,
-                    icon: const Icon(Icons.photo_camera, size: 20),
-                    label: const Text("Upload Store Icon"),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.all(12),
-                      backgroundColor: Colors.grey.shade100,
-                      foregroundColor: Colors.blue.shade700,
-                    ),
+                // 2. Upload Button
+                ElevatedButton.icon(
+                  onPressed: _isLoading ? null : _pickImage,
+                  icon: const Icon(Icons.photo_camera, size: 20),
+                  label: const Text("Upload Store Icon"),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.all(12),
+                    backgroundColor: Colors.grey.shade100,
+                    foregroundColor: Colors.blue.shade700,
                   ),
-                  const SizedBox(height: 16),
+                ),
+                const SizedBox(height: 16),
 
-                  // 3. Save Button
-                  ElevatedButton.icon(
-                    onPressed: (_pickedImage == null && _pickedXFile == null) || _isLoading
-                        ? null
+                // 3. Save Button
+                ElevatedButton.icon(
+                  onPressed: (_pickedImage == null && _pickedXFile == null) || _isLoading
+                      ? null
                         : _saveStoreIcon,
                     icon: _isLoading
                         ? const SizedBox(
@@ -331,7 +301,51 @@ class _StoreSettingsViewState extends State<StoreSettingsView> {
                       foregroundColor: Colors.white,
                     ),
                   ),
-                ],
+                const SizedBox(height: 24),
+
+                // 4. Optional: Store Location Section
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Store Location',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _latitude == 0.0 && _longitude == 0.0
+                            ? 'No location set yet'
+                            : 'Latitude: $_latitude, Longitude: $_longitude',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      ElevatedButton.icon(
+                        onPressed: _showMapPicker,
+                        icon: const Icon(Icons.map_rounded, size: 18),
+                        label: const Text('Set Store Location'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(double.infinity, 40),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),

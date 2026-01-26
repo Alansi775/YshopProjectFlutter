@@ -7,9 +7,10 @@ import 'common.dart';
 import 'admin_order_map_view.dart';
 import 'widgets.dart' as w;
 import 'package:latlong2/latlong.dart';
+import '../delivery/delivery_shared.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 📊 ORDERS & REVENUE MANAGEMENT VIEW
+//  ORDERS & REVENUE MANAGEMENT VIEW
 // ═══════════════════════════════════════════════════════════════════════════════
 
 class OrdersManagementView extends StatefulWidget {
@@ -28,6 +29,7 @@ class _OrdersManagementViewState extends State<OrdersManagementView> {
   double _totalRevenue = 0.0;
   double _appRevenue = 0.0;
   double _storeRevenue = 0.0;
+  double _driverRevenue = 0.0;
 
   @override
   void initState() {
@@ -45,16 +47,21 @@ class _OrdersManagementViewState extends State<OrdersManagementView> {
         // Calculate revenue
         double total = 0.0;
         double app = 0.0;
+        double driver = 0.0;
+        double store = 0.0;
         for (final order in orders) {
           total += order.totalPrice;
           app += RevenueCalculator.calculateAppRevenue(order.totalPrice);
+          driver += RevenueCalculator.calculateDriverRevenue(order.totalPrice);
+          store += RevenueCalculator.calculateStoreOwnerRevenue(order.totalPrice);
         }
         
         setState(() {
           _orders = orders;
           _totalRevenue = total;
           _appRevenue = app;
-          _storeRevenue = total - app;
+          _driverRevenue = driver;
+          _storeRevenue = store;
           _isLoading = false;
         });
       }
@@ -191,17 +198,17 @@ class _OrdersManagementViewState extends State<OrdersManagementView> {
                     )),
                     const SizedBox(width: 16),
                     Expanded(child: _RevenueStatCard(
-                      title: 'Store Earnings (75%)',
+                      title: 'Store Earnings (65%)',
                       value: '\$${_storeRevenue.toStringAsFixed(2)}',
                       icon: Icons.storefront_rounded,
                       gradient: AppGradients.purple,
                     )),
                     const SizedBox(width: 16),
                     Expanded(child: _RevenueStatCard(
-                      title: 'Total Orders',
-                      value: '${_orders.length}',
-                      icon: Icons.receipt_long_rounded,
-                      gradient: AppGradients.cyan,
+                      title: 'Driver Earnings (10%)',
+                      value: '\$${_driverRevenue.toStringAsFixed(2)}',
+                      icon: Icons.delivery_dining_rounded,
+                      gradient: AppGradients.warning,
                     )),
                   ],
                 );
@@ -237,10 +244,10 @@ class _OrdersManagementViewState extends State<OrdersManagementView> {
                       )),
                       const SizedBox(width: 12),
                       Expanded(child: _RevenueStatCard(
-                        title: 'Total Orders',
-                        value: '${_orders.length}',
-                        icon: Icons.receipt_long_rounded,
-                        gradient: AppGradients.cyan,
+                        title: 'Driver Earnings',
+                        value: '\$${_driverRevenue.toStringAsFixed(2)}',
+                        icon: Icons.delivery_dining_rounded,
+                        gradient: AppGradients.warning,
                       )),
                     ],
                   ),
@@ -384,6 +391,8 @@ class _OrderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final appEarning = RevenueCalculator.calculateAppRevenue(order.totalPrice);
     final storeEarning = RevenueCalculator.calculateStoreOwnerRevenue(order.totalPrice);
+    final driverEarning = RevenueCalculator.calculateDriverRevenue(order.totalPrice);
+    final currencySymbol = getCurrencySymbol(order.currency);
     
     return w.GlassContainer(
       onTap: onTap,
@@ -446,8 +455,8 @@ class _OrderCard extends StatelessWidget {
               Expanded(
                 child: _OrderInfoItem(
                   icon: Icons.storefront_rounded,
-                  label: 'Store ID',
-                  value: order.storeId,
+                  label: 'Store',
+                  value: order.storeName.isNotEmpty ? order.storeName : order.storeId,
                 ),
               ),
               Expanded(
@@ -485,6 +494,25 @@ class _OrderCard extends StatelessWidget {
             ],
           ),
           
+          const SizedBox(height: 12),
+          
+          // Driver info
+          if (order.driverName != null && order.driverName!.isNotEmpty)
+            Row(
+              children: [
+                const Icon(Icons.delivery_dining_rounded, size: 16, color: kAccentBlue),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${order.driverName}' + (order.driverPhone != null ? ' • ${order.driverPhone}' : ''),
+                    style: const TextStyle(color: kAccentBlue, fontSize: 13, fontWeight: FontWeight.w500),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          
           const SizedBox(height: 16),
           const Divider(color: kSeparatorColor, height: 1),
           const SizedBox(height: 16),
@@ -502,7 +530,7 @@ class _OrderCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '\$${order.totalPrice.toStringAsFixed(2)}',
+                      '${getCurrencySymbol(order.currency)}${order.totalPrice.toStringAsFixed(2)}',
                       style: const TextStyle(
                         color: kPrimaryTextColor,
                         fontSize: 18,
@@ -524,7 +552,7 @@ class _OrderCard extends StatelessWidget {
                     const Icon(Icons.arrow_upward_rounded, color: kAccentGreen, size: 16),
                     const SizedBox(width: 6),
                     Text(
-                      'Your: \$${appEarning.toStringAsFixed(2)}',
+                      'Your: ${getCurrencySymbol(order.currency)}${appEarning.toStringAsFixed(2)}',
                       style: const TextStyle(
                         color: kAccentGreen,
                         fontWeight: FontWeight.w600,
@@ -547,9 +575,32 @@ class _OrderCard extends StatelessWidget {
                     const Icon(Icons.storefront_rounded, color: kAccentBlue, size: 16),
                     const SizedBox(width: 6),
                     Text(
-                      'Store: \$${storeEarning.toStringAsFixed(2)}',
+                      'Store: ${getCurrencySymbol(order.currency)}${storeEarning.toStringAsFixed(2)}',
                       style: const TextStyle(
                         color: kAccentBlue,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.orange.withOpacity(0.3), width: 1),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.delivery_dining_rounded, color: Colors.orange, size: 16),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Driver: ${getCurrencySymbol(order.currency)}${driverEarning.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        color: Colors.orange,
                         fontWeight: FontWeight.w600,
                         fontSize: 13,
                       ),
@@ -563,6 +614,7 @@ class _OrderCard extends StatelessWidget {
       ),
     );
   }
+
 
   Gradient _getStatusGradient(String status) {
     switch (status.toLowerCase()) {
@@ -650,6 +702,8 @@ class _OrderDetailsDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final appEarning = RevenueCalculator.calculateAppRevenue(order.totalPrice);
     final storeEarning = RevenueCalculator.calculateStoreOwnerRevenue(order.totalPrice);
+    final driverEarning = RevenueCalculator.calculateDriverRevenue(order.totalPrice);
+    final currencySymbol = getCurrencySymbol(order.currency);
     
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -714,7 +768,7 @@ class _OrderDetailsDialog extends StatelessWidget {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              '\$${order.totalPrice.toStringAsFixed(2)}',
+                              '${getCurrencySymbol(order.currency)}${order.totalPrice.toStringAsFixed(2)}',
                               style: const TextStyle(
                                 color: kPrimaryTextColor,
                                 fontSize: 28,
@@ -734,7 +788,7 @@ class _OrderDetailsDialog extends StatelessWidget {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              '\$${appEarning.toStringAsFixed(2)}',
+                              '$currencySymbol${appEarning.toStringAsFixed(2)}',
                               style: const TextStyle(
                                 color: kAccentGreen,
                                 fontSize: 24,
@@ -754,9 +808,29 @@ class _OrderDetailsDialog extends StatelessWidget {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              '\$${storeEarning.toStringAsFixed(2)}',
+                              '$currencySymbol${storeEarning.toStringAsFixed(2)}',
                               style: const TextStyle(
                                 color: kAccentBlue,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(width: 1, height: 60, color: kSeparatorColor),
+                      Expanded(
+                        child: Column(
+                          children: [
+                            const Text(
+                              'Driver Earning',
+                              style: TextStyle(color: Colors.orange, fontSize: 13),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '$currencySymbol${driverEarning.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                color: Colors.orange,
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -767,6 +841,7 @@ class _OrderDetailsDialog extends StatelessWidget {
                     ],
                   ),
                 ),
+
                 
                 const SizedBox(height: 24),
                 
@@ -783,9 +858,13 @@ class _OrderDetailsDialog extends StatelessWidget {
                 
                 _DetailItem(label: 'Order ID', value: order.id, icon: Icons.tag_rounded),
                 _DetailItem(label: 'User ID', value: order.oderId, icon: Icons.person_rounded),
-                _DetailItem(label: 'Store ID', value: order.storeId, icon: Icons.storefront_rounded),
+                _DetailItem(label: 'Store', value: order.storeName.isNotEmpty ? order.storeName : order.storeId, icon: Icons.storefront_rounded),
                 _DetailItem(label: 'Payment Method', value: order.paymentMethod, icon: Icons.payment_rounded),
                 _DetailItem(label: 'Delivery Option', value: order.deliveryOption, icon: Icons.local_shipping_rounded),
+                if (order.driverName != null && order.driverName!.isNotEmpty) ...[
+                  _DetailItem(label: 'Driver Name', value: order.driverName!, icon: Icons.person_pin_rounded),
+                  _DetailItem(label: 'Driver Phone', value: order.driverPhone ?? 'N/A', icon: Icons.phone_rounded),
+                ],
                 _DriverStatusCard(order: order),
                 _DetailItem(
                   label: 'Created At',
@@ -960,6 +1039,12 @@ class _DriverStatusCardState extends State<_DriverStatusCard> {
   String _driverName = '';
   bool _hasDriver = false;
 
+  @override
+  void initState() {
+    super.initState();
+    _loadStatus();
+  }
+
   Future<void> _loadStatus() async {
     setState(() { _loading = true; });
     try {
@@ -980,43 +1065,51 @@ class _DriverStatusCardState extends State<_DriverStatusCard> {
       if (storeLat != null && storeLng != null) storeLoc = LatLng(storeLat, storeLng);
       if (custLat != null && custLng != null) custLoc = LatLng(custLat, custLng);
 
-      // driver location in order payload?
+      // Try to get driver location from OrderModel first
       LatLng? driverLoc;
-      final dloc = orderData['driver_location'];
-      if (dloc is Map) {
-        final dlat = _parseDouble(dloc['latitude'] ?? dloc['lat']);
-        final dlng = _parseDouble(dloc['longitude'] ?? dloc['lng'] ?? dloc['long']);
-        if (dlat != null && dlng != null) driverLoc = LatLng(dlat, dlng);
+      if (widget.order.driverLatitude != null && widget.order.driverLongitude != null) {
+        driverLoc = LatLng(widget.order.driverLatitude!, widget.order.driverLongitude!);
+        _driverName = widget.order.driverName ?? '';
       }
 
-      // if no embedded driver loc, try driver uid lookup
-      final driverUid = orderData['driver_id']?.toString() ?? orderData['driverId']?.toString();
-      Map<String, dynamic>? driverData;
-      if (driverLoc == null && driverUid != null && driverUid.isNotEmpty) {
-        try {
-          driverData = await ApiService.getDeliveryRequestByUid(driverUid);
-        } catch (_) { driverData = null; }
-
-        if (driverData == null) {
-          try {
-            final lists = <dynamic>[];
-            final active = await ApiService.getActiveDeliveryRequests();
-            lists.addAll(active);
-            final approved = await ApiService.getApprovedDeliveryRequests();
-            lists.addAll(approved);
-            final pending = await ApiService.getPendingDeliveryRequests();
-            lists.addAll(pending);
-
-            final found = lists.cast<dynamic?>().firstWhere((e) => (e?['uid'] ?? e?['UID'] ?? '') == driverUid, orElse: () => null);
-            if (found != null) driverData = Map<String, dynamic>.from(found as Map);
-          } catch (_) {}
+      // If no driver location in OrderModel, try from order data
+      if (driverLoc == null) {
+        final dloc = orderData['driver_location'];
+        if (dloc is Map) {
+          final dlat = _parseDouble(dloc['latitude'] ?? dloc['lat']);
+          final dlng = _parseDouble(dloc['longitude'] ?? dloc['lng'] ?? dloc['long']);
+          if (dlat != null && dlng != null) driverLoc = LatLng(dlat, dlng);
         }
 
-        if (driverData != null) {
-          final dlat = _parseDouble(driverData['latitude'] ?? driverData['lat']);
-          final dlng = _parseDouble(driverData['longitude'] ?? driverData['lng'] ?? driverData['long']);
-          if (dlat != null && dlng != null) driverLoc = LatLng(dlat, dlng);
-          _driverName = (driverData['name'] ?? driverData['full_name'] ?? '') as String? ?? '';
+        // if no embedded driver loc, try driver uid lookup
+        final driverUid = orderData['driver_id']?.toString() ?? orderData['driverId']?.toString();
+        Map<String, dynamic>? driverData;
+        if (driverLoc == null && driverUid != null && driverUid.isNotEmpty) {
+          try {
+            driverData = await ApiService.getDeliveryRequestByUid(driverUid);
+          } catch (_) { driverData = null; }
+
+          if (driverData == null) {
+            try {
+              final lists = <dynamic>[];
+              final active = await ApiService.getActiveDeliveryRequests();
+              lists.addAll(active);
+              final approved = await ApiService.getApprovedDeliveryRequests();
+              lists.addAll(approved);
+              final pending = await ApiService.getPendingDeliveryRequests();
+              lists.addAll(pending);
+
+              final found = lists.cast<dynamic?>().firstWhere((e) => (e?['uid'] ?? e?['UID'] ?? '') == driverUid, orElse: () => null);
+              if (found != null) driverData = Map<String, dynamic>.from(found as Map);
+            } catch (_) {}
+          }
+
+          if (driverData != null) {
+            final dlat = _parseDouble(driverData['latitude'] ?? driverData['lat']);
+            final dlng = _parseDouble(driverData['longitude'] ?? driverData['lng'] ?? driverData['long']);
+            if (dlat != null && dlng != null) driverLoc = LatLng(dlat, dlng);
+            _driverName = (driverData['name'] ?? driverData['full_name'] ?? '') as String? ?? '';
+          }
         }
       }
 
@@ -1065,12 +1158,6 @@ class _DriverStatusCardState extends State<_DriverStatusCard> {
       debugPrint('Driver status load failed: $e');
       setState(() { _loading = false; _hasDriver = false; });
     }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _loadStatus();
   }
 
   String _formatDuration(double seconds) {

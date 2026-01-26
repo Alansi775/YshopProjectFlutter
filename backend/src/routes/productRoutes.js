@@ -4,7 +4,7 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import ProductController from '../controllers/ProductController.js';
 import { validateProduct, handleValidationErrors } from '../middleware/validation.js';
-import { verifyFirebaseToken, verifyAdminRole } from '../middleware/auth.js';
+import { verifyFirebaseToken, verifyAdminToken, verifyAdminRole } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -46,14 +46,14 @@ const upload = multer({
 // to avoid '/admin/...' being captured by '/:id'.
 
 // ==================== ADMIN ROUTES (must come first) ====================
-router.get('/admin/pending', verifyFirebaseToken, verifyAdminRole, ProductController.getPendingProducts);
-router.get('/admin/approved', verifyFirebaseToken, verifyAdminRole, ProductController.getApprovedProducts);
-router.get('/admin/by-email', verifyFirebaseToken, verifyAdminRole, ProductController.getProductsByEmail);
-router.get('/admin/store/:storeId', verifyFirebaseToken, verifyAdminRole, ProductController.getStoreProductsAdmin);
-router.put('/admin/:id/status', verifyFirebaseToken, verifyAdminRole, ProductController.updateProductStatus);
-router.put('/admin/:id/approve', verifyFirebaseToken, verifyAdminRole, ProductController.approveProduct);
-router.put('/admin/:id/reject', verifyFirebaseToken, verifyAdminRole, ProductController.rejectProduct);
-router.put('/admin/:id/toggle-status', verifyFirebaseToken, verifyAdminRole, ProductController.toggleProductStatus);
+router.get('/admin/pending', verifyAdminToken, verifyAdminRole, ProductController.getPendingProducts);
+router.get('/admin/approved', verifyAdminToken, verifyAdminRole, ProductController.getApprovedProducts);
+router.get('/admin/by-email', verifyAdminToken, verifyAdminRole, ProductController.getProductsByEmail);
+router.get('/admin/store/:storeId', verifyAdminToken, verifyAdminRole, ProductController.getStoreProductsAdmin);
+router.put('/admin/:id/status', verifyAdminToken, verifyAdminRole, ProductController.updateProductStatus);
+router.put('/admin/:id/approve', verifyAdminToken, verifyAdminRole, ProductController.approveProduct);
+router.put('/admin/:id/reject', verifyAdminToken, verifyAdminRole, ProductController.rejectProduct);
+router.put('/admin/:id/toggle-status', verifyAdminToken, verifyAdminRole, ProductController.toggleProductStatus);
 
 // Public product listing and details
 router.get('/', ProductController.getAll);

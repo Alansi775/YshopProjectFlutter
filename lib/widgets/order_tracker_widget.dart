@@ -4,7 +4,7 @@ import '../services/api_service.dart';
 import 'package:intl/intl.dart';
 import '../state_management/cart_manager.dart';
 import '../services/navigation_service.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import '../state_management/auth_manager.dart';
 
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -12,6 +12,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/product.dart';
+import '../screens/auth/sign_in_ui.dart';
+import 'dart:ui' as ui;
 
 /// Optimized Order Tracker - Fast loading, smooth UX
 class OrderTrackerWidget extends StatefulWidget {
@@ -28,54 +30,72 @@ class _OrderTrackerWidgetState extends State<OrderTrackerWidget> {
   Timer? _pollingTimer;
   bool _isLoading = false;
   bool _isCheckingLatestOrder = false;
-  StreamSubscription<User?>? _authSubscription;
-  String? _lastSeenUid;
+  String? _lastCheckedUserId;
   DateTime? _lastClearTime;
+  DateTime? _lastCheckTime; // 🔥 Track when we last checked for orders
+  int _consecutiveAuthErrors = 0; // 🔥 Track consecutive 401 errors to stop infinite retries
 
   @override
   void initState() {
     super.initState();
-    // Fetch latest order on widget init if no active order
-    _checkForLatestOrder();
-    // Listen for user logout and clear order data
-    _listenForUserLogout();
+    // 🔥 CRITICAL FIX: Don't call _checkForLatestOrder() here!
+    // The token may not be loaded yet. Wait for didChangeDependencies instead.
+    // didChangeDependencies will trigger once AuthManager is ready.
   }
 
   @override
   void dispose() {
     _pollingTimer?.cancel();
-    _authSubscription?.cancel();
     super.dispose();
   }
 
-  // NEW: Listen for user logout and clear data
-  void _listenForUserLogout() {
-    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((user) {
-      if (user == null && _lastSeenUid != null && mounted) {
-        // User logged out (transition from logged in to null)
-        // Throttle to prevent multiple rapid-fire calls
+  // Check auth changes via AuthManager
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final authManager = Provider.of<AuthManager>(context, listen: true);
+    
+    // If user logged out, clear everything
+    if (!authManager.isAuthenticated && _lastCheckedUserId != null) {
+      _clearOrderData();
+      _lastCheckedUserId = null;
+      _consecutiveAuthErrors = 0; // Reset error counter
+      return;
+    }
+    
+    // If user is authenticated and has a profile, check for orders
+    if (authManager.isAuthenticated && authManager.userProfile != null) {
+      final newUserId = authManager.userProfile?['uid']?.toString();
+      
+      // 🔥 Only check if:
+      // 1. User ID changed (new login)
+      // 2. AND at least 5 seconds have passed
+      // 3. AND no recent 401 errors (wait for user to manually retry)
+      if (newUserId != _lastCheckedUserId && newUserId != null) {
+        _lastCheckedUserId = newUserId;
+        _consecutiveAuthErrors = 0; // Reset counter for new user
+        
         final now = DateTime.now();
-        if (_lastClearTime == null || now.difference(_lastClearTime!).inMilliseconds > 500) {
-          _lastClearTime = now;
-          _clearOrderData();
+        if (_lastCheckTime == null || now.difference(_lastCheckTime!).inSeconds >= 5) {
+          _lastCheckTime = now;
+          _checkForLatestOrder();
         }
-        _lastSeenUid = null;
-      } else if (user != null) {
-        // User logged in
-        _lastSeenUid = user.uid;
       }
-    });
+    }
   }
 
   // Clear all cached order data
   void _clearOrderData() {
     _pollingTimer?.cancel();
-    setState(() {
-      _cachedOrder = null;
-      _currentOrderId = null;
-      _isLoading = false;
-      _isCheckingLatestOrder = false;
-    });
+    // 🔥 CRITICAL: Check if mounted before setState to avoid "setState after dispose" errors
+    if (mounted) {
+      setState(() {
+        _cachedOrder = null;
+        _currentOrderId = null;
+        _isLoading = false;
+        _isCheckingLatestOrder = false;
+      });
+    }
     // Also clear from CartManager using Future.microtask to avoid setState during build
     Future.microtask(() {
       if (mounted) {
@@ -157,19 +177,33 @@ class _OrderTrackerWidgetState extends State<OrderTrackerWidget> {
 
   // NEW: Fetch the latest undelivered order for current user
   Future<void> _checkForLatestOrder() async {
-    if (_isCheckingLatestOrder || _currentOrderId != null) return;
+    // 🔥 CRITICAL: Check if already checking or if still authenticated
+    if (_isCheckingLatestOrder) return;
     
-    // Check if user is still logged in
-    final currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser == null) {
+    // 🔥 NEW: If too many consecutive 401 errors, stop trying until next login
+    if (_consecutiveAuthErrors >= 3) {
+      debugPrint('⚠️ Too many auth errors (${_consecutiveAuthErrors}), stopping order checks. User needs to re-login.');
+      return;
+    }
+    
+    // Check if user is still logged in BEFORE making request
+    final authManager = Provider.of<AuthManager>(context, listen: false);
+    if (!authManager.isAuthenticated) {
       _clearOrderData();
       return;
     }
+    
+    // If there's already a current order being tracked, don't fetch new ones
+    if (_currentOrderId != null) return;
     
     _isCheckingLatestOrder = true;
     try {
       // Fetch all orders and get the latest non-delivered one
       final orders = await ApiService.getUserOrders();
+      
+      // 🔥 Success = reset error counter
+      _consecutiveAuthErrors = 0;
+      
       if (orders != null && orders.isNotEmpty && mounted) {
         // Find latest order that's not delivered
         Map<String, dynamic>? latestPendingOrder;
@@ -208,13 +242,29 @@ class _OrderTrackerWidgetState extends State<OrderTrackerWidget> {
       }
     } catch (e) {
       debugPrint('Error checking for latest order: $e');
-      // Check if it's a 401 (unauthorized - user logged out)
+      
+      // Check if it's a 401 (unauthorized - token invalid or expired)
       if (e is ApiException && e.isUnauthorized) {
-        debugPrint('Got 401 - User likely logged out');
+        _consecutiveAuthErrors++;
+        debugPrint('❌ Got 401 (error #$_consecutiveAuthErrors) - Token invalid or expired');
+        
+        // After 3 consecutive 401s, stop trying - user needs to re-login
+        if (_consecutiveAuthErrors >= 3) {
+          debugPrint('🛑 Too many auth errors, clearing data. User should re-login.');
+          _clearOrderData();
+        }
+      } 
+      // If 429 (rate limited), reset error counter and stop
+      else if (e is ApiException && e.isRateLimited) {
+        _consecutiveAuthErrors = 0; // Reset on 429
+        debugPrint('Got 429 - Rate limited, stopping order checks temporarily');
         _clearOrderData();
-      } else {
-        // For other errors, don't retry automatically, let retry timer handle it
       }
+      // For other errors, just log
+      else {
+        _consecutiveAuthErrors = 0; // Reset on other errors
+      }
+      // For other errors, just log but don't retry automatically
     } finally {
       _isCheckingLatestOrder = false;
     }
@@ -224,11 +274,12 @@ class _OrderTrackerWidgetState extends State<OrderTrackerWidget> {
   void _startLightPolling(String orderId) {
     _pollingTimer?.cancel();
     
-    // Poll every 30 seconds for status updates only
-    _pollingTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
+    // 🔥 Poll every 90 seconds (NOT 60) to prevent overwhelming API with rate limiting
+    // Multiple widgets + profile fetches were causing combined 429 errors
+    _pollingTimer = Timer.periodic(const Duration(seconds: 90), (_) async {
       // Check if user is still logged in
-      final currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser == null) {
+      final authManager = Provider.of<AuthManager>(context, listen: false);
+      if (!authManager.isAuthenticated) {
         _clearOrderData();
         return;
       }
@@ -250,9 +301,26 @@ class _OrderTrackerWidgetState extends State<OrderTrackerWidget> {
         }
       } catch (e) {
         debugPrint('Light polling error: $e');
-        // If 401 error, user likely logged out
+        
+        // If 401, stop polling - token is invalid
         if (e is ApiException && e.isUnauthorized) {
+          debugPrint('🛑 Got 401 during polling - stopping. User needs to re-login.');
+          _pollingTimer?.cancel();
           _clearOrderData();
+          return;
+        }
+        
+        // If 429 (rate limit), stop polling and wait
+        if (e is ApiException && e.isRateLimited) {
+          debugPrint('Got rate limited (429) - pausing polling for 10 minutes');
+          _pollingTimer?.cancel();
+          // Retry after 10 minutes
+          Future.delayed(const Duration(minutes: 10), () {
+            if (mounted && _currentOrderId == orderId) {
+              debugPrint('Retrying polling after rate limit cooldown');
+              _startLightPolling(orderId);
+            }
+          });
         }
       }
     });
@@ -535,15 +603,8 @@ class _OrderDetailsSheetState extends State<_OrderDetailsSheet> {
   @override
   void initState() {
     super.initState();
-    // Show initial data immediately, then augment in background
-    if (widget.initialData != null) {
-      _orderData = Map<String, dynamic>.from(widget.initialData!);
-      _isLoading = false;
-      // Augment data in background (fetch product names, etc.)
-      _augmentOrderData();
-    } else {
-      _fetchFullOrder();
-    }
+    // ALWAYS fetch the full order to ensure we have complete data with items
+    _fetchFullOrder();
 
     // Poll for status updates only (lightweight) every 30 seconds
     _statusTimer = Timer.periodic(const Duration(seconds: 30), (_) => _refreshStatus());
@@ -557,12 +618,39 @@ class _OrderDetailsSheetState extends State<_OrderDetailsSheet> {
 
   Future<void> _fetchFullOrder() async {
     try {
+      // First, try to get the full order from user's orders list (which is authenticated)
+      final orders = await ApiService.getUserOrders();
+      
+      if (orders != null && orders.isNotEmpty) {
+        // Find the order with matching ID
+        Map<String, dynamic>? foundOrder;
+        for (final order in orders) {
+          final orderId = order['id']?.toString() ?? order['order_id']?.toString();
+          if (orderId == widget.orderId) {
+            foundOrder = order;
+            break;
+          }
+        }
+        
+        if (foundOrder != null && mounted) {
+          setState(() {
+            _orderData = Map<String, dynamic>.from(foundOrder!);
+            _isLoading = false;
+          });
+          debugPrint('✅ Fetched order ${widget.orderId} from user orders - items: ${foundOrder["items"]?.length ?? 0}');
+          _augmentOrderData();
+          return;
+        }
+      }
+      
+      // Fallback: Try direct API call (may not have auth token)
       final order = await ApiService.getOrderById(widget.orderId);
       if (order != null && mounted) {
         setState(() {
           _orderData = Map<String, dynamic>.from(order);
           _isLoading = false;
         });
+        debugPrint('✅ Fetched order ${widget.orderId} directly - items: ${order["items"]?.length ?? 0}');
         _augmentOrderData();
       }
     } catch (e) {
@@ -575,13 +663,19 @@ class _OrderDetailsSheetState extends State<_OrderDetailsSheet> {
   Future<void> _refreshStatus() async {
     if (_orderData == null) return;
     try {
-      final order = await ApiService.getOrderById(widget.orderId);
-      if (order != null && mounted) {
-        final newStatus = order['status'];
-        if (newStatus != _orderData!['status']) {
-          setState(() {
-            _orderData!['status'] = newStatus;
-          });
+      final orders = await ApiService.getUserOrders();
+      if (orders != null) {
+        for (final order in orders) {
+          if ((order['id']?.toString() ?? order['order_id']?.toString()) == widget.orderId) {
+            final newStatus = order['status'];
+            if (newStatus != _orderData!['status'] && mounted) {
+              setState(() {
+                _orderData!['status'] = newStatus;
+              });
+              debugPrint('✅ Status updated to: $newStatus');
+            }
+            return;
+          }
         }
       }
     } catch (_) {}
@@ -613,7 +707,9 @@ class _OrderDetailsSheetState extends State<_OrderDetailsSheet> {
       }
 
       // Fetch product details for items (in parallel for speed)
-      final items = (order['items'] as List<dynamic>?) ?? [];
+      var items = (order['items'] as List<dynamic>?) ?? [];
+      debugPrint('📦 AUGMENT: Initial items count: ${items.length}');
+      
       if (items.isNotEmpty) {
         final futures = <Future>[];
         final productCache = <String, dynamic>{};
@@ -631,6 +727,7 @@ class _OrderDetailsSheetState extends State<_OrderDetailsSheet> {
         await Future.wait(futures);
 
         // Attach product info to items
+        final updatedItems = <dynamic>[];
         for (var i = 0; i < items.length; i++) {
           final item = Map<String, dynamic>.from(items[i] as Map);
           final pid = (item['product_id'] ?? item['productId'])?.toString();
@@ -648,9 +745,10 @@ class _OrderDetailsSheetState extends State<_OrderDetailsSheet> {
             item['imageUrl'] = resolvedImage;
             item['storeName'] = item['storeName'] ?? prod['store_name'] ?? prod['storeName'];
           }
-          items[i] = item;
+          updatedItems.add(item);
         }
-        order['items'] = items;
+        order['items'] = updatedItems;
+        debugPrint('📦 AUGMENT: After augmentation, items count: ${order["items"].length}');
       }
 
       // Fetch user profile for delivery instructions (only if missing)
@@ -708,6 +806,7 @@ class _OrderDetailsSheetState extends State<_OrderDetailsSheet> {
     final documentId = orderData['documentId']?.toString() ?? orderData['id']?.toString() ?? 'N/A';
     final deliveryOption = orderData['deliveryOption'] ?? orderData['delivery_option'] ?? 'Standard';
     final items = (orderData['items'] as List<dynamic>?) ?? [];
+    debugPrint('📦 ITEMS COUNT: ${items.length} | Items data: $items');
     final storeName = items.isNotEmpty ? (items.first['storeName'] ?? 'Store') : 'Store';
 
     final Color primaryColor = Theme.of(context).colorScheme.primary;
@@ -725,39 +824,61 @@ class _OrderDetailsSheetState extends State<_OrderDetailsSheet> {
       {'title': 'Delivered', 'status': 'Delivered', 'icon': Icons.home_outlined},
     ];
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 25.0, vertical: 30.0),
+      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 25.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Order ID
+          // Order ID - Premium Glass Badge
           Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(25),
-              ),
-              child: Text(
-                "Order: $documentId",
-                style: widget.getTenorSansStyle(context, 14, weight: FontWeight.w600, color: primaryColor),
-                textAlign: TextAlign.center,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(25),
+              child: BackdropFilter(
+                filter: ui.ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.05),
+                    border: Border.all(
+                      color: isDark ? Colors.white.withOpacity(0.12) : Colors.black.withOpacity(0.08),
+                      width: 1.2,
+                    ),
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                  child: Text(
+                    "Order #$documentId",
+                    style: TextStyle(
+                      fontFamily: 'TenorSans',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? LuxuryTheme.kPlatinum : LuxuryTheme.kDeepNavy,
+                      letterSpacing: 0.5,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
               ),
             ),
           ),
-          const SizedBox(height: 25),
+          const SizedBox(height: 28),
 
-          // Tracking Timeline
+          // Tracking Timeline - Premium Enhanced
           _buildTrackingTimeline(context, trackingSteps, status),
 
           // Live Map (only when out for delivery)
           if (status == 'Out for Delivery') ...[
-            Divider(height: 30, thickness: 1.5, color: Theme.of(context).dividerColor),
+            Divider(height: 32, thickness: 0.8, color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.08)),
             Center(
               child: Text(
                 "Driver Location (Live)",
-                style: widget.getTenorSansStyle(context, 18, weight: FontWeight.bold)
-                    .copyWith(color: _getStatusColor(status)),
+                style: TextStyle(
+                  fontFamily: 'Didot',
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: _getStatusColor(status),
+                ),
               ),
             ),
             const SizedBox(height: 15),
@@ -767,54 +888,163 @@ class _OrderDetailsSheetState extends State<_OrderDetailsSheet> {
             ),
           ],
 
-          Divider(height: 30, thickness: 1.5, color: Theme.of(context).dividerColor),
+          Divider(height: 32, thickness: 0.8, color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.08)),
 
-          // Order Summary
-          Text(
-            "$storeName Order Summary",
-            style: widget.getTenorSansStyle(context, 18, weight: FontWeight.bold),
-          ),
-          const SizedBox(height: 15),
+          // Order Summary - Premium Liquid Glass
+          _buildSectionHeader(context, "$storeName Order Summary"),
+          const SizedBox(height: 16),
 
-          _buildDetailRow(context, "Order Time:", formattedTime, icon: Icons.access_time),
-          _buildDetailRow(context, "Payment Method:", paymentMethod, icon: Icons.credit_card_outlined),
-          _buildDetailRow(context, "Total Amount:", "\$${total.toStringAsFixed(2)}", color: Colors.deepOrange),
-
-          Divider(height: 30, thickness: 0.8, color: Theme.of(context).dividerColor),
-
-          // Items
-          Text(
-            "Items Ordered (${items.length})",
-            style: widget.getTenorSansStyle(context, 18, weight: FontWeight.bold),
-          ),
-          const SizedBox(height: 15),
-
-          ...items.map((item) => _buildProductItem(context, Map<String, dynamic>.from(item))).toList(),
-
-          Divider(height: 30, thickness: 0.8, color: Theme.of(context).dividerColor),
-
-          // Delivery Info
-          Center(
-            child: Text(
-              "Delivery Info",
-              style: widget.getTenorSansStyle(context, 18, weight: FontWeight.bold),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: BackdropFilter(
+              filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.04),
+                  border: Border.all(
+                    color: isDark ? Colors.white.withOpacity(0.12) : Colors.black.withOpacity(0.08),
+                    width: 1.2,
+                  ),
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: [
+                    BoxShadow(
+                      color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.03),
+                      blurRadius: 12,
+                      spreadRadius: 0,
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  children: [
+                    _buildDetailRow(context, "Order Time:", formattedTime, icon: Icons.access_time),
+                    const SizedBox(height: 14),
+                    _buildDetailRow(context, "Payment Method:", paymentMethod, icon: Icons.credit_card_outlined),
+                    const SizedBox(height: 14),
+                    _buildDetailRow(context, "Total Amount:", "\$${total.toStringAsFixed(2)}", color: Colors.deepOrange),
+                  ],
+                ),
+              ),
             ),
           ),
-          const SizedBox(height: 15),
 
-          _buildDetailRow(context, "Delivery Method:", deliveryOption, icon: _getDeliveryIcon(deliveryOption)),
-          _buildDetailRow(
-            context,
-            "Address:",
-            _formatFullAddress(orderData),
-            isAddress: true,
-            icon: Icons.location_on_outlined,
+          Divider(height: 32, thickness: 0.8, color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.08)),
+
+          // Items Section - مع Badge أنيق
+          Row(
+            children: [
+              Text(
+                "Items Ordered",
+                style: TextStyle(
+                  fontFamily: 'Didot',
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? LuxuryTheme.kPlatinum : LuxuryTheme.kDeepNavy,
+                ),
+              ),
+              const SizedBox(width: 12),
+              if (items.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.deepOrange.shade400, Colors.deepOrange.shade600],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.deepOrange.withOpacity(0.3),
+                        blurRadius: 8,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    '${items.length}',
+                    style: const TextStyle(
+                      fontFamily: 'TenorSans',
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+            ],
           ),
-          _buildDetailRow(
-            context,
-            "Instructions:",
-            orderData['delivery_instructions'] ?? 'None',
-            icon: Icons.notes_outlined,
+          const SizedBox(height: 16),
+
+          if (items.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 30),
+              child: Center(
+                child: Text(
+                  'No items in this order',
+                  style: TextStyle(
+                    fontFamily: 'TenorSans',
+                    fontSize: 14,
+                    color: isDark ? LuxuryTheme.kPlatinum.withOpacity(0.6) : LuxuryTheme.kDeepNavy.withOpacity(0.6),
+                  ),
+                ),
+              ),
+            )
+          else
+            ...items.map((item) => _buildProductItem(context, Map<String, dynamic>.from(item))).toList(),
+
+          Divider(height: 32, thickness: 0.8, color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.08)),
+
+          // Delivery Info
+          _buildSectionHeader(context, "Delivery Info"),
+          const SizedBox(height: 16),
+
+          ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: BackdropFilter(
+              filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.04),
+                  border: Border.all(
+                    color: isDark ? Colors.white.withOpacity(0.12) : Colors.black.withOpacity(0.08),
+                    width: 1.2,
+                  ),
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: [
+                    BoxShadow(
+                      color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.03),
+                      blurRadius: 12,
+                      spreadRadius: 0,
+                    ),
+                  ],
+                ),
+
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  children: [
+                    _buildDetailRow(context, "Delivery Method:", deliveryOption, icon: _getDeliveryIcon(deliveryOption)),
+                    const SizedBox(height: 14),
+                    _buildDetailRow(
+                      context,
+                      "Address:",
+                      _formatFullAddress(orderData),
+                      isAddress: true,
+                      icon: Icons.location_on_outlined,
+                    ),
+
+                    const SizedBox(height: 14),
+                    _buildDetailRow(
+                      context,
+                      "Instructions:",
+                      orderData['delivery_instructions'] ?? 'None',
+                      icon: Icons.notes_outlined,
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
 
           const SizedBox(height: 40),
@@ -941,86 +1171,132 @@ class _OrderDetailsSheetState extends State<_OrderDetailsSheet> {
   }
 
   Widget _buildProductItem(BuildContext context, Map<String, dynamic> item) {
-    final Color secondaryColor = Theme.of(context).colorScheme.onSurface;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final price = widget.toDouble(item['price']);
     final quantity = item['quantity'] as int? ?? 1;
 
     final String imageUrlStr = (item['imageUrl'] as String?) ?? '';
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 15.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 60,
-            height: 60,
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+          child: Container(
             decoration: BoxDecoration(
-              color: secondaryColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
-              image: imageUrlStr.isNotEmpty
-                  ? DecorationImage(
-                      image: NetworkImage(imageUrlStr),
-                      fit: BoxFit.cover,
-                    )
-                  : null,
+              color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.02),
+              border: Border.all(
+                color: isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.05),
+              ),
+              borderRadius: BorderRadius.circular(14),
             ),
-            child: imageUrlStr.isEmpty
-                ? Icon(Icons.image_not_supported, color: secondaryColor.withOpacity(0.5))
-                : null,
-          ),
-          const SizedBox(width: 15),
-          Expanded(
-            child: Column(
+            padding: const EdgeInsets.all(12),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  item['name'] as String? ?? 'Product',
-                  style: widget.getTenorSansStyle(context, 16, weight: FontWeight.w600),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                // Product Image
+                Container(
+                  width: 70,
+                  height: 70,
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    image: imageUrlStr.isNotEmpty
+                        ? DecorationImage(
+                            image: NetworkImage(imageUrlStr),
+                            fit: BoxFit.cover,
+                          )
+                        : null,
+                  ),
+                  child: imageUrlStr.isEmpty
+                      ? Icon(
+                          Icons.image_not_supported,
+                          color: isDark ? Colors.white.withOpacity(0.3) : Colors.black.withOpacity(0.2),
+                        )
+                      : null,
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(width: 14),
+                // Product Info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item['name'] as String? ?? 'Product',
+                        style: TextStyle(
+                          fontFamily: 'TenorSans',
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? LuxuryTheme.kPlatinum : LuxuryTheme.kDeepNavy,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Qty: $quantity × \$${price.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontFamily: 'TenorSans',
+                          fontSize: 13,
+                          color: isDark ? LuxuryTheme.kPlatinum.withOpacity(0.7) : LuxuryTheme.kDeepNavy.withOpacity(0.7),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Total Price
                 Text(
-                  'Qty: $quantity x \$${price.toStringAsFixed(2)}',
-                  style: widget.getTenorSansStyle(context, 14).copyWith(color: secondaryColor.withOpacity(0.7)),
+                  '\$${(price * quantity).toStringAsFixed(2)}',
+                  style: TextStyle(
+                    fontFamily: 'TenorSans',
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.deepOrange,
+                  ),
                 ),
               ],
             ),
           ),
-          Text(
-            '\$${(price * quantity).toStringAsFixed(2)}',
-            style: widget.getTenorSansStyle(context, 16, weight: FontWeight.bold, color: Colors.deepOrange),
-          ),
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildDetailRow(BuildContext context, String label, dynamic value,
       {Color? color, IconData? icon, bool isAddress = false}) {
-    final Color secondaryColor = Theme.of(context).colorScheme.onSurface;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      padding: const EdgeInsets.symmetric(vertical: 6.0),
       child: Row(
         crossAxisAlignment: isAddress ? CrossAxisAlignment.start : CrossAxisAlignment.center,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 20, color: secondaryColor.withOpacity(0.7)),
-            const SizedBox(width: 10),
+            Icon(icon, size: 18, color: isDark ? LuxuryTheme.kPlatinum.withOpacity(0.6) : LuxuryTheme.kDeepNavy.withOpacity(0.6)),
+            const SizedBox(width: 12),
           ],
           SizedBox(
-            width: 130,
+            width: 120,
             child: Text(
               label,
-              style: widget.getTenorSansStyle(context, 15).copyWith(color: secondaryColor.withOpacity(0.7)),
+              style: TextStyle(
+                fontFamily: 'TenorSans',
+                fontSize: 13,
+                color: isDark ? LuxuryTheme.kPlatinum.withOpacity(0.7) : LuxuryTheme.kDeepNavy.withOpacity(0.7),
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
           Expanded(
             child: Text(
               value.toString(),
-              style: widget.getTenorSansStyle(context, 15, weight: FontWeight.w600).copyWith(color: color),
+              style: TextStyle(
+                fontFamily: 'TenorSans',
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: color ?? (isDark ? LuxuryTheme.kPlatinum : LuxuryTheme.kDeepNavy),
+              ),
               textAlign: TextAlign.right,
               maxLines: isAddress ? 4 : 2,
               overflow: TextOverflow.ellipsis,
@@ -1032,40 +1308,88 @@ class _OrderDetailsSheetState extends State<_OrderDetailsSheet> {
   }
 
   Widget _buildTrackingTimeline(BuildContext context, List<Map<String, dynamic>> steps, String currentStatus) {
-    return SizedBox(
-      height: 90,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: steps.map((step) {
-          final isCompleted = _isStepCompleted(step['status'] as String, currentStatus);
-          Color statusColor = _getStatusColor(step['status']);
-          final color = isCompleted ? statusColor : Theme.of(context).dividerColor;
-          final icon = step['icon'] as IconData;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        children: [
+          SizedBox(
+            height: 100,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: steps.asMap().entries.map((entry) {
+                final index = entry.key;
+                final step = entry.value;
+                final isCompleted = _isStepCompleted(step['status'] as String, currentStatus);
+                final isCurrent = step['status'] == currentStatus;
+                final statusColor = _getStatusColor(step['status']);
+                final icon = step['icon'] as IconData;
 
-          return Expanded(
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: color, width: 2),
+                return Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Status Circle
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: isCompleted
+                              ? LinearGradient(
+                                  colors: [statusColor, statusColor.withOpacity(0.7)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                )
+                              : null,
+                          color: isCompleted ? null : (isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.05)),
+                          border: Border.all(
+                            color: isCompleted ? statusColor : (isDark ? Colors.white.withOpacity(0.2) : Colors.black.withOpacity(0.1)),
+                            width: isCurrent ? 2.5 : 1.5,
+                          ),
+                          boxShadow: isCurrent
+                              ? [
+                                  BoxShadow(
+                                    color: statusColor.withOpacity(0.3),
+                                    blurRadius: 12,
+                                    spreadRadius: 2,
+                                  ),
+                                ]
+                              : [],
+                        ),
+                        child: Center(
+                          child: Icon(
+                            icon,
+                            color: isCompleted ? Colors.white : (isDark ? LuxuryTheme.kPlatinum : LuxuryTheme.kDeepNavy),
+                            size: 24,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      // Status Label
+                      Text(
+                        step['title'] as String,
+                        style: TextStyle(
+                          fontFamily: 'TenorSans',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: isCurrent ? statusColor : (isCompleted ? statusColor : (isDark ? LuxuryTheme.kPlatinum.withOpacity(0.7) : LuxuryTheme.kDeepNavy.withOpacity(0.7))),
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
-                  child: Icon(icon, color: color, size: 28),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  step['title'] as String,
-                  style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600),
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+                );
+              }).toList(),
             ),
-          );
-        }).toList(),
+          ),
+        ],
       ),
     );
   }
@@ -1117,6 +1441,19 @@ class _OrderDetailsSheetState extends State<_OrderDetailsSheet> {
       default:
         return Colors.red.shade600;
     }
+  }
+
+  Widget _buildSectionHeader(BuildContext context, String title) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Text(
+      title,
+      style: TextStyle(
+        fontFamily: 'Didot',
+        fontSize: 18,
+        fontWeight: FontWeight.bold,
+        color: isDark ? LuxuryTheme.kPlatinum : LuxuryTheme.kDeepNavy,
+      ),
+    );
   }
 }
 

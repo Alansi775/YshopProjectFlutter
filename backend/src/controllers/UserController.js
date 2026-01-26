@@ -6,9 +6,9 @@ import pool from '../config/database.js';
 export class UserController {
   static async getProfile(req, res, next) {
     try {
-      const uid = req.user.uid;
+      const userId = req.user.id;
 
-      const user = await User.findByUid(uid);
+      const user = await User.findById(userId);
 
       if (!user) {
         return res.status(404).json({
@@ -29,24 +29,31 @@ export class UserController {
 
   static async getUserStore(req, res, next) {
     try {
-      //  PRIORITY: Get uid from query parameter FIRST (for store owner switches)
-      // Then fall back to Firebase token
-      let uid = req.query.uid || req.body.uid || req.user?.uid;
+      //  PRIORITY: Get uid from query parameter FIRST
+      // Then fall back to store ID from token (for store owner)
+      // Then fall back to email
+      let uid = req.query.uid || req.body.uid;
+      let storeId = req.query.storeId || req.body.storeId || req.user?.id;
+      let email = req.user?.email;
       
-      if (!uid) {
-        return res.status(400).json({
-          success: false,
-          message: 'User UID is required',
-        });
+      let store = null;
+
+      // Try by UID first
+      if (uid) {
+        logger.debug(`getUserStore: Looking for store with uid=${uid}`);
+        store = await Store.findByOwnerUid(uid);
       }
 
-      logger.debug(`getUserStore: Looking for store with owner_uid=${uid}`);
-      let store = await Store.findByOwnerUid(uid);
+      // Try by store ID
+      if (!store && storeId) {
+        logger.debug(`getUserStore: Looking for store with id=${storeId}`);
+        store = await Store.findById(storeId);
+      }
 
-      // If no store found by uid, try to find by email (covers cases where owner UID mismatch)
-      if (!store && req.user && req.user.email) {
-        logger.debug(`getUserStore: No store found by UID, trying email: ${req.user.email}`);
-        store = await Store.findByOwnerEmail(req.user.email);
+      // Try by email
+      if (!store && email) {
+        logger.debug(`getUserStore: Looking for store with email=${email}`);
+        store = await Store.findByOwnerEmail(email);
       }
 
       if (!store) {
@@ -65,11 +72,15 @@ export class UserController {
       next(error);
     }
   }
-
   static async updateProfile(req, res, next) {
     try {
-      const uid = req.user.uid;
-      const {
+      // 🔥 CRITICAL: req.user.id is from JWT and contains uid (not numeric MySQL id)
+      const userId = req.user.id;
+      if (!userId) {
+        return res.status(401).json({ success: false, message: 'User ID not found in token' });
+      }
+      
+      let {
         displayName,
         phone,
         address,
@@ -82,18 +93,53 @@ export class UserController {
         deliveryInstructions,
       } = req.body;
 
-      const user = await User.update(uid, {
-        displayName,
-        surname,
-        phone,
-        address,
-        latitude,
-        longitude,
-        nationalId,
-        buildingInfo,
-        apartmentNumber,
-        deliveryInstructions,
+      logger.info('updateProfile - Raw req.body:', {
+        displayName: typeof displayName,
+        phone: typeof phone,
+        address: typeof address,
+        latitude: typeof latitude,
+        longitude: typeof longitude,
+        nationalId: typeof nationalId,
+        surname: typeof surname,
+        buildingInfo: typeof buildingInfo,
+        apartmentNumber: typeof apartmentNumber,
+        deliveryInstructions: typeof deliveryInstructions,
       });
+
+      // 🔥 CRITICAL: Filter out undefined/null/empty values
+      const updateData = {};
+      
+      // Helper function to check if value is valid
+      const isValidValue = (val) => {
+        const isValid = val !== undefined && val !== null && val !== '' && (typeof val !== 'number' || !isNaN(val));
+        if (!isValid) logger.debug(`isValidValue failed for:`, { val, type: typeof val });
+        return isValid;
+      };
+      
+      if (isValidValue(displayName)) updateData.displayName = String(displayName).trim();
+      if (isValidValue(surname)) updateData.surname = String(surname).trim();
+      if (isValidValue(phone)) updateData.phone = String(phone).trim();
+      if (isValidValue(address)) updateData.address = String(address).trim();
+      if (isValidValue(latitude) && latitude !== 0) updateData.latitude = parseFloat(latitude);
+      if (isValidValue(longitude) && longitude !== 0) updateData.longitude = parseFloat(longitude);
+      if (isValidValue(nationalId)) updateData.nationalId = String(nationalId).trim();
+      if (isValidValue(buildingInfo)) updateData.buildingInfo = String(buildingInfo).trim();
+      if (isValidValue(apartmentNumber)) updateData.apartmentNumber = String(apartmentNumber).trim();
+      if (isValidValue(deliveryInstructions)) updateData.deliveryInstructions = String(deliveryInstructions).trim();
+
+      logger.info(`updateProfile - filtered data:`, { updateData, userId });
+
+      // If no valid fields to update, return current user data
+      if (Object.keys(updateData).length === 0) {
+        logger.info(`updateProfile - no fields to update, returning current user`);
+        const user = await User.findById(userId);
+        return res.json({
+          success: true,
+          data: user,
+        });
+      }
+
+      const user = await User.update(userId, updateData);
 
       res.json({
         success: true,

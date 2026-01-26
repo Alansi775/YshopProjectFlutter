@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
@@ -39,14 +38,7 @@ class CartManager with ChangeNotifier {
 
   CartManager() {
     _init();
-    _authSub = FirebaseAuth.instance.authStateChanges().listen((user) {
-      if (user != null) {
-        _init();
-      }
-    });
   }
-
-  StreamSubscription<User?>? _authSub;
 
   Future<void> _init() async {
     try {
@@ -146,7 +138,7 @@ class CartManager with ChangeNotifier {
       await Future.delayed(const Duration(milliseconds: 300));
       ApiService.clearPendingRequests();
       
-      // 🔄 Refresh from backend with retry logic
+      //  Refresh from backend with retry logic
       int retries = 0;
       while (retries < 3) {
         await _fetchCart();
@@ -218,7 +210,7 @@ class CartManager with ChangeNotifier {
           await Future.delayed(const Duration(milliseconds: 200));
           ApiService.clearPendingRequests();
 
-          // 🔄 Refresh from backend
+          //  Refresh from backend
           await _fetchCart();
           print(' CartManager.updateQuantity - COMPLETE');
         } catch (e) {
@@ -281,7 +273,7 @@ class CartManager with ChangeNotifier {
         await Future.delayed(const Duration(milliseconds: 300));
         ApiService.clearPendingRequests();
 
-        // 🔄 Refresh from backend with retry to verify deletion
+        //  Refresh from backend with retry to verify deletion
         int retries = 0;
         while (retries < 3) {
           await _fetchCart();
@@ -423,7 +415,6 @@ class CartManager with ChangeNotifier {
 
   @override
   void dispose() {
-    _authSub?.cancel();
     super.dispose();
   }
 }

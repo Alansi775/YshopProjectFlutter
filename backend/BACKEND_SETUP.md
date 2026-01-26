@@ -1,18 +1,18 @@
-# ✅ Backend API - نظام الفئات - تم الإعداد!
+#  Backend API - نظام الفئات - تم الإعداد!
 
 ## 🚀 ما تم إضافته
 
-### ✅ Files المُضافة:
+###  Files المُضافة:
 ```
 backend/src/routes/categoryRoutes.js  ← API Implementation
 ```
 
-### ✅ Files المُحدّثة:
+###  Files المُحدّثة:
 ```
 backend/src/server.js  ← أضفنا الـ routes
 ```
 
-### ✅ Database:
+###  Database:
 ```
 categories table   ← موجود ومحدث مع جميع الـ columns
 products.category_id  ← موجود بالفعل
@@ -20,7 +20,7 @@ products.category_id  ← موجود بالفعل
 
 ---
 
-## 📊 API Endpoints (جاهزة للاستخدام)
+##  API Endpoints (جاهزة للاستخدام)
 
 ### 1️⃣ Get All Categories
 ```bash
@@ -111,14 +111,14 @@ curl -X PUT "http://localhost:3000/api/v1/products/1/category" \
 
 ---
 
-## ✅ الحالة
+##  الحالة
 
 | المكون | الحالة |
 |------|-------|
-| API Routes | ✅ موجود |
-| Database | ✅ موجود ومحدث |
-| Server Integration | ✅ متصل |
-| Backend Server | ✅ يعمل |
+| API Routes |  موجود |
+| Database |  موجود ومحدث |
+| Server Integration |  متصل |
+| Backend Server |  يعمل |
 
 ---
 
@@ -136,7 +136,7 @@ PUT    /api/v1/products/:productId/category
 
 ---
 
-## 🎯 الخطوة التالية
+##  الخطوة التالية
 
 الآن التطبيق الـ Flutter يجب أن يعمل! 🚀
 
@@ -151,4 +151,4 @@ flutter run
 
 ---
 
-**تم الإعداد بنجاح! ✅**
+**تم الإعداد بنجاح! **

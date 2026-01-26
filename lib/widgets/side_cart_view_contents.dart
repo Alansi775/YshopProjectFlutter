@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../state_management/cart_manager.dart';
 import '../screens/customers/checkout_screen.dart';
 import 'cart_item_widget.dart';
+import '../screens/auth/sign_in_ui.dart';
 
 class SideCartViewContents extends StatelessWidget {
   const SideCartViewContents({Key? key}) : super(key: key);
@@ -22,8 +23,7 @@ class SideCartViewContents extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Consumer<CartManager>(
       builder: (context, cartManager, child) {
@@ -31,7 +31,7 @@ class SideCartViewContents extends StatelessWidget {
 
         return Container(
           decoration: BoxDecoration(
-            color: theme.scaffoldBackgroundColor,
+            color: isDark ? LuxuryTheme.kDarkBackground : LuxuryTheme.kLightBackground,
             borderRadius: const BorderRadius.only(topLeft: Radius.circular(30)),
           ),
           child: Column(
@@ -44,11 +44,19 @@ class SideCartViewContents extends StatelessWidget {
                   children: [
                     Text(
                       "MY CART",
-                      style: _getTenorSansStyle(context, 22, weight: FontWeight.bold),
+                      style: TextStyle(
+                        fontFamily: 'Didot',
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? LuxuryTheme.kPlatinum : LuxuryTheme.kDeepNavy,
+                      ),
                     ),
                     IconButton(
                       onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close_rounded),
+                      icon: Icon(
+                        Icons.close_rounded,
+                        color: isDark ? LuxuryTheme.kPlatinum : LuxuryTheme.kDeepNavy,
+                      ),
                     )
                   ],
                 ),
@@ -93,15 +101,23 @@ class SideCartViewContents extends StatelessWidget {
   }
 
   Widget _buildModernBottomBar(BuildContext context, CartManager cartManager) {
-    final theme = Theme.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ClipRRect(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
         child: Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: theme.cardColor.withOpacity(0.9),
-            border: Border(top: BorderSide(color: theme.dividerColor.withOpacity(0.1))),
+            color: isDark
+                ? LuxuryTheme.kDarkSurface.withOpacity(0.8)
+                : LuxuryTheme.kLightSurface.withOpacity(0.8),
+            border: Border(
+              top: BorderSide(
+                color: isDark
+                    ? LuxuryTheme.kPlatinum.withOpacity(0.1)
+                    : LuxuryTheme.kDeepNavy.withOpacity(0.1),
+              ),
+            ),
           ),
           child: SafeArea(
             top: false,
@@ -111,40 +127,84 @@ class SideCartViewContents extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text("SUBTOTAL", style: _getTenorSansStyle(context, 14, color: Colors.grey)),
+                    Text(
+                      "SUBTOTAL",
+                      style: TextStyle(
+                        fontFamily: 'TenorSans',
+                        fontSize: 14,
+                        color: isDark
+                            ? LuxuryTheme.kPlatinum.withOpacity(0.6)
+                            : LuxuryTheme.kDeepNavy.withOpacity(0.6),
+                      ),
+                    ),
                     Text(
                       "${cartManager.currencySymbol}${cartManager.totalAmount.toStringAsFixed(2)}",
-                      style: _getTenorSansStyle(context, 20, weight: FontWeight.bold, color: theme.primaryColor),
+                      style: TextStyle(
+                        fontFamily: 'Didot',
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? LuxuryTheme.kPlatinum : LuxuryTheme.kDeepNavy,
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CheckoutScreen())),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: theme.colorScheme.primary,
-                    foregroundColor: theme.colorScheme.onPrimary,
-                    minimumSize: const Size(double.infinity, 55),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                    elevation: 0,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.shopping_bag_outlined, size: 20),
-                      const SizedBox(width: 10),
-                      Flexible(
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.center,
-                          child: Text(
-                            "CONTINUE TO CHECKOUT",
-                            style: _getTenorSansStyle(context, 14, weight: FontWeight.bold, color: theme.colorScheme.onPrimary),
-                            textAlign: TextAlign.center,
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(15),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? Colors.white.withOpacity(0.08)
+                            : Colors.black.withOpacity(0.05),
+                        border: Border.all(
+                          color: isDark
+                              ? Colors.white.withOpacity(0.15)
+                              : Colors.black.withOpacity(0.1),
+                        ),
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CheckoutScreen())),
+                          borderRadius: BorderRadius.circular(15),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.shopping_bag_outlined,
+                                  size: 20,
+                                  color: isDark ? LuxuryTheme.kPlatinum : LuxuryTheme.kDeepNavy,
+                                ),
+                                const SizedBox(width: 10),
+                                Flexible(
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      "CONTINUE TO CHECKOUT",
+                                      style: TextStyle(
+                                        fontFamily: 'TenorSans',
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: isDark
+                                            ? LuxuryTheme.kPlatinum
+                                            : LuxuryTheme.kDeepNavy,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ],

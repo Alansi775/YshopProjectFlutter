@@ -1,10 +1,10 @@
 
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/product.dart';
 import '../models/currency.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
+import '../state_management/auth_manager.dart';
 import '../services/api_service.dart';
 
 // دالة مساعدة لتحويل الرابط النسبي إلى رابط كامل
@@ -100,7 +100,7 @@ class ProductS {
       storeOwnerEmail: p.storeOwnerEmail ?? 'N/A',
       storeName: p.storeName ?? 'N/A',
       storePhone: p.storePhone ?? 'N/A',
-      customerID: FirebaseAuth.instance.currentUser?.uid ?? 'Unknown_Customer_ID',
+      customerID: 'customer_id',
       stock: p.stock,
       currency: p.currency,
     );

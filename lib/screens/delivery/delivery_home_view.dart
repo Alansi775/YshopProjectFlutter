@@ -6,7 +6,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -15,6 +15,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../services/api_service.dart';
+import '../../state_management/auth_manager.dart';
 import '../auth/sign_in_view.dart';
 import 'delivery_shared.dart' as ds;
 import 'delivery_qr_scanner_view.dart';
@@ -50,7 +51,6 @@ class DeliveryHomeView extends StatefulWidget {
 }
 
 class _DeliveryHomeViewState extends State<DeliveryHomeView> with TickerProviderStateMixin {
-  final _auth = FirebaseAuth.instance;
 
   bool _isWorking = false;
   ds.DeliveryRequest? _driverProfile;
@@ -87,22 +87,36 @@ class _DeliveryHomeViewState extends State<DeliveryHomeView> with TickerProvider
     super.dispose();
   }
 
+  String? _getUserUid() {
+    return Provider.of<AuthManager>(context, listen: false).userProfile?['uid'] as String?;
+  }
+
   Future<void> _loadDriverStatus() async {
-    final uid = _auth.currentUser?.uid;
-    if (uid == null) return;
+    final uid = _getUserUid();
+    if (uid == null) {
+      debugPrint('❌ [_loadDriverStatus] No UID found in profile');
+      return;
+    }
     
+    debugPrint(' [_loadDriverStatus] Loading profile for UID: $uid');
     try {
       final drv = await ApiService.getDeliveryRequestByUid(uid);
-      if (drv != null && mounted) {
-        setState(() {
-          _driverProfile = ds.DeliveryRequest.fromMap(drv);
-          _isWorking = _driverProfile!.isWorking;
-        });
+      if (drv != null) {
+        debugPrint(' [_loadDriverStatus] Got driver profile: ${drv['email']}, Status: ${drv['status']}');
+        if (mounted) {
+          setState(() {
+            _driverProfile = ds.DeliveryRequest.fromMap(drv);
+            _isWorking = _driverProfile!.isWorking;
+            debugPrint('📋 [_loadDriverStatus] Profile loaded - Status: ${_driverProfile!.status}, Working: $_isWorking');
+          });
+        }
         await _checkForActiveOrder();
         if (_isWorking) {
           _startLocationTracking();
           _startOrderChecking();
         }
+      } else {
+        debugPrint('❌ [_loadDriverStatus] No driver profile found for UID: $uid');
       }
     } catch (e) {
       debugPrint('Failed to load driver status: $e');
@@ -110,7 +124,7 @@ class _DeliveryHomeViewState extends State<DeliveryHomeView> with TickerProvider
   }
 
   Future<void> _checkForActiveOrder() async {
-    final uid = _auth.currentUser?.uid;
+    final uid = _getUserUid();
     if (uid == null) return;
     
     try {
@@ -126,7 +140,7 @@ class _DeliveryHomeViewState extends State<DeliveryHomeView> with TickerProvider
   }
 
   Future<void> _toggleWorkingStatus() async {
-    final uid = _auth.currentUser?.uid;
+    final uid = _getUserUid();
     if (uid == null || _driverProfile?.status != "Approved") {
       _showSnackBar('Your account is not approved yet.', isError: true);
       return;
@@ -229,7 +243,7 @@ class _DeliveryHomeViewState extends State<DeliveryHomeView> with TickerProvider
   Future<void> _checkForNewOrders() async {
     if (_currentLocation == null || _activeOrder != null || _isOfferDialogShowing) return;
     
-    final uid = _auth.currentUser?.uid;
+    final uid = _getUserUid();
     if (uid == null) return;
 
     try {
@@ -241,7 +255,7 @@ class _DeliveryHomeViewState extends State<DeliveryHomeView> with TickerProvider
       
       if (offerData != null && mounted && !_isOfferDialogShowing) {
         final offer = ds.OrderOffer.fromJson(offerData);
-        debugPrint('🎁 Got offer: Order #${offer.orderId} from ${offer.storeName}');
+        debugPrint('🎁 Got offer: Order #${offer.orderId} from ${offer.storeName}, Currency: ${offer.currency ?? "NOT SET"}, Price: ${offer.totalPrice}');
         _showOrderOfferDialog(offer);
       }
     } catch (e) {
@@ -268,7 +282,7 @@ class _DeliveryHomeViewState extends State<DeliveryHomeView> with TickerProvider
   }
 
   Future<void> _acceptOffer(ds.OrderOffer offer) async {
-    final uid = _auth.currentUser?.uid;
+    final uid = _getUserUid();
     if (uid == null) return;
 
     Navigator.of(context).pop();
@@ -305,7 +319,7 @@ class _DeliveryHomeViewState extends State<DeliveryHomeView> with TickerProvider
   }
 
   Future<void> _acceptOfferWithRoutes(ds.OrderOffer offer, List<LatLng> routeToStore, List<LatLng> routeToCustomer, LatLng? driverLocation) async {
-    final uid = _auth.currentUser?.uid;
+    final uid = _getUserUid();
     if (uid == null) return;
 
     Navigator.of(context).pop();
@@ -343,7 +357,7 @@ class _DeliveryHomeViewState extends State<DeliveryHomeView> with TickerProvider
   }
 
   Future<void> _skipOffer(ds.OrderOffer offer) async {
-    final uid = _auth.currentUser?.uid;
+    final uid = _getUserUid();
     if (uid == null) return;
 
     Navigator.of(context).pop();
@@ -437,7 +451,10 @@ class _DeliveryHomeViewState extends State<DeliveryHomeView> with TickerProvider
 
   void _logout() async {
     _stopAllTracking();
-    await _auth.signOut();
+    
+    final authManager = Provider.of<AuthManager>(context, listen: false);
+    await authManager.signOut();
+    
     if (mounted) {
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (context) => const SignInView()),
@@ -461,6 +478,7 @@ class _DeliveryHomeViewState extends State<DeliveryHomeView> with TickerProvider
   @override
   Widget build(BuildContext context) {
     final isApproved = _driverProfile?.status == "Approved";
+    debugPrint('🏗️ [build] Rendering - _driverProfile: ${_driverProfile != null ? "✓ LOADED" : "✗ NULL"}, status: ${_driverProfile?.status}, isApproved: $isApproved');
 
     return Scaffold(
       backgroundColor: kDarkBackground,
@@ -583,10 +601,13 @@ class _DeliveryHomeViewState extends State<DeliveryHomeView> with TickerProvider
   }
 
   Widget _buildMainContent(bool isApproved) {
+    debugPrint('🏠 [_buildMainContent] isApproved: $isApproved, _driverProfile: ${_driverProfile?.status}, _isWorking: $_isWorking');
     if (!isApproved) {
+      debugPrint('❌ [_buildMainContent] Showing Pending Approval - profile not approved');
       return _buildEmptyState(Icons.hourglass_top_rounded, "Pending Approval", "Your application is under review.");
     }
     if (!_isWorking) {
+      debugPrint('📴 [_buildMainContent] Showing Offline state');
       return _buildEmptyState(Icons.power_settings_new_rounded, "You are Offline", "Go online to receive orders.");
     }
     if (_activeOrder != null) {
@@ -674,7 +695,7 @@ class _DeliveryHomeViewState extends State<DeliveryHomeView> with TickerProvider
           const Text("Active Delivery", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: kPrimaryTextColor)),
           const SizedBox(height: 16),
           GestureDetector(
-            onTap: () => _navigateToDeliveryMap(_activeOrder!),
+            onTap: _isOpenNavLoading ? null : () => _openNavigationWithPreload(_activeOrder!),
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -705,7 +726,7 @@ class _DeliveryHomeViewState extends State<DeliveryHomeView> with TickerProvider
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(color: kAccentGreen.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-                        child: Text("\$${_activeOrder!.total.toStringAsFixed(2)}", style: const TextStyle(color: kAccentGreen, fontWeight: FontWeight.bold)),
+                        child: Text("${ds.getCurrencySymbol(_activeOrder!.currency ?? 'USD')}${_activeOrder!.total.toStringAsFixed(2)}", style: const TextStyle(color: kAccentGreen, fontWeight: FontWeight.bold)),
                       ),
                     ],
                   ),
@@ -721,6 +742,25 @@ class _DeliveryHomeViewState extends State<DeliveryHomeView> with TickerProvider
                     const SizedBox(width: 8),
                     Expanded(child: Text(_activeOrder!.addressFull, style: const TextStyle(color: kSecondaryTextColor, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis)),
                   ]),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.monetization_on_rounded, color: Colors.orange, size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Your Earnings: ${ds.getCurrencySymbol(_activeOrder!.currency ?? 'USD')}${(_activeOrder!.total * 0.10).toStringAsFixed(2)}',
+                          style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: 16),
                   SizedBox(
                     width: double.infinity,
@@ -840,6 +880,7 @@ class _OrderOfferDialogState extends State<OrderOfferDialog> {
   void initState() {
     super.initState();
     _secondsRemaining = widget.offer.remainingSeconds.clamp(1, 120);
+    debugPrint('💰 OrderOfferDialog - Currency: ${widget.offer.currency}, Total: ${widget.offer.totalPrice}');
     _startCountdown();
     _fetchRoutes();
   }
@@ -1036,9 +1077,9 @@ class _OrderOfferDialogState extends State<OrderOfferDialog> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _buildInfoChip(Icons.attach_money, "\$${widget.offer.totalPrice.toStringAsFixed(2)}", "Order"),
+                  _buildInfoChip(Icons.attach_money, "${ds.getCurrencySymbol(widget.offer.currency)}${widget.offer.totalPrice.toStringAsFixed(2)}", "Order"),
                   _buildInfoChip(Icons.route, _totalDistanceMeters > 0 ? _formatDistance(_totalDistanceMeters) : widget.offer.formattedDistance, "Distance"),
-                  _buildInfoChip(Icons.monetization_on, "\$${widget.offer.estimatedEarnings.toStringAsFixed(2)}", "Earn"),
+                  _buildInfoChip(Icons.monetization_on, "${ds.getCurrencySymbol(widget.offer.currency)}${widget.offer.estimatedEarnings.toStringAsFixed(2)}", "Earn"),
                 ],
               ),
             ),

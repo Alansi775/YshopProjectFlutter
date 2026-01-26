@@ -171,13 +171,18 @@ export class StoreController {
   //  NEW: Single endpoint for ALL dashboard data (replaces 6 separate requests!)
   static async getDashboardStats(req, res, next) {
     try {
+      // 🔥 CRITICAL: Prevent all caching levels
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
+      
       const [pendingStores, approvedStores, pendingProducts, activeDeliveries, pendingDeliveries, orders] = await Promise.all([
         Store.findPending(),
         Store.findApproved(),
-        pool.query('SELECT COUNT(*) as count FROM products WHERE status = "pending"'),
-        pool.query('SELECT COUNT(*) as count FROM delivery_requests WHERE status = "working"'),
-        pool.query('SELECT COUNT(*) as count FROM delivery_requests WHERE status = "pending"'),
-        pool.query('SELECT * FROM orders ORDER BY created_at DESC LIMIT 50'),
+        pool.query('SELECT SQL_NO_CACHE COUNT(*) as count FROM products WHERE status = "pending"'),
+        pool.query('SELECT SQL_NO_CACHE COUNT(*) as count FROM delivery_requests WHERE status = "working"'),
+        pool.query('SELECT SQL_NO_CACHE COUNT(*) as count FROM delivery_requests WHERE status = "pending"'),
+        pool.query('SELECT SQL_NO_CACHE * FROM orders ORDER BY created_at DESC LIMIT 50'),
       ]);
 
       const pendingProductCount = pendingProducts[0][0]?.count || 0;

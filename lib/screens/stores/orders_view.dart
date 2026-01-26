@@ -1,4 +1,6 @@
 import 'dart:ui';
+import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import 'package:intl/intl.dart';
@@ -74,6 +76,7 @@ class _OrdersViewState extends State<OrdersView> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   Future<List<dynamic>>? _ordersFuture;
+  Timer? _refreshTimer;
   
   // Responsive Max Width for Web/Tablet
   static const double kMaxWidth = 700.0;
@@ -87,11 +90,21 @@ class _OrdersViewState extends State<OrdersView> {
       });
     });
     _ordersFuture = _loadOrders();
+    
+    // Refresh orders every 10 seconds to get real-time driver location updates
+    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) {
+        setState(() {
+          _ordersFuture = _loadOrders();
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _refreshTimer?.cancel();
     super.dispose();
   }
 
@@ -373,8 +386,24 @@ class _OrdersViewState extends State<OrdersView> {
     final String? driverPhone = (driverMap?['phone'] ?? driverMap?['phoneNumber'] ?? orderData['driverPhone'] ?? orderData['driver_phone'])?.toString();
     // driver id + coordinates (if available)
     final driverId = (orderData['driver_id'] ?? orderData['driverId'] ?? orderData['driver_uid'] ?? orderData['driverUID'])?.toString();
-    final drvLatRaw = driverMap?['latitude'] ?? driverMap?['lat'] ?? orderData['driverLatitude'] ?? orderData['driver_latitude'] ?? orderData['driver_lat'];
-    final drvLngRaw = driverMap?['longitude'] ?? driverMap?['lng'] ?? orderData['driverLongitude'] ?? orderData['driver_longitude'] ?? orderData['driver_lng'];
+    
+    // Get driver location from either driver_location JSON or driver_latitude/longitude fields
+    Map<String, dynamic>? driverLocationJson;
+    if (orderData['driver_location'] != null) {
+      try {
+        final locData = orderData['driver_location'];
+        if (locData is String) {
+          driverLocationJson = jsonDecode(locData);
+        } else if (locData is Map) {
+          driverLocationJson = Map<String, dynamic>.from(locData);
+        }
+      } catch (e) {
+        debugPrint('Error parsing driver_location: $e');
+      }
+    }
+    
+    final drvLatRaw = driverLocationJson?['latitude'] ?? driverMap?['latitude'] ?? driverMap?['lat'] ?? orderData['driverLatitude'] ?? orderData['driver_latitude'] ?? orderData['driver_lat'];
+    final drvLngRaw = driverLocationJson?['longitude'] ?? driverMap?['longitude'] ?? driverMap?['lng'] ?? orderData['driverLongitude'] ?? orderData['driver_longitude'] ?? orderData['driver_lng'];
     final double? driverLat = drvLatRaw != null ? (drvLatRaw is num ? drvLatRaw.toDouble() : double.tryParse(drvLatRaw.toString())) : null;
     final double? driverLng = drvLngRaw != null ? (drvLngRaw is num ? drvLngRaw.toDouble() : double.tryParse(drvLngRaw.toString())) : null;
 

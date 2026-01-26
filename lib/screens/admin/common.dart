@@ -1,7 +1,6 @@
 // lib/screens/admin/common.dart
 
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 🎨 YSHOP BRAND DESIGN SYSTEM - Matching Current App Style
@@ -64,7 +63,7 @@ const Color kSidebarItemHover = Color(0xFF252529);
 const Color kSidebarItemActive = Color(0xFF2D2D32);
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 🎯 GRADIENT DEFINITIONS - Minimal & Clean
+//  GRADIENT DEFINITIONS - Minimal & Clean
 // ═══════════════════════════════════════════════════════════════════════════════
 
 class AppGradients {
@@ -151,6 +150,8 @@ class ProductSS {
   final String status;
   final bool approved;
   final String? currency;
+  final int? categoryId;
+  final String? categoryName;
 
   ProductSS({
     required this.id,
@@ -167,23 +168,26 @@ class ProductSS {
     required this.status,
     required this.approved,
     this.currency,
+    this.categoryId,
+    this.categoryName,
   });
 
-  factory ProductSS.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory ProductSS.fromJson(Map<String, dynamic> json) {
     return ProductSS(
-      id: doc.id,
-      storeName: data["storeName"] as String? ?? "",
-      storeId: data["storeId"] as String? ?? "",
-      name: data["name"] as String? ?? "",
-      price: (data["price"] is num) ? data["price"].toString() : data["price"] as String? ?? "0.00",
-      description: data["description"] as String? ?? "",
-      imageUrl: data["imageUrl"] as String?,
-      storeOwnerEmail: data["storeOwnerEmail"] as String? ?? "",
-      storePhone: data["storePhone"] as String? ?? "No Phone",
-      status: data["status"] as String? ?? "Pending",
-      approved: data["approved"] as bool? ?? false,
-      currency: data["currency"] as String? ?? "USD",
+      id: json["id"]?.toString() ?? "",
+      storeName: json["store_name"] as String? ?? "",
+      storeId: json["store_id"]?.toString() ?? "",
+      name: json["name"] as String? ?? "",
+      price: (json["price"] is num) ? json["price"].toString() : json["price"] as String? ?? "0.00",
+      description: json["description"] as String? ?? "",
+      imageUrl: json["image_url"] as String?,
+      storeOwnerEmail: json["store_owner_email"] as String? ?? "",
+      storePhone: json["store_phone"] as String? ?? "No Phone",
+      status: json["status"] as String? ?? "Pending",
+      approved: json["approved"] as bool? ?? false,
+      currency: json["currency"] as String? ?? "USD",
+      categoryId: json["category_id"] as int?,
+      categoryName: json["category_name"] as String?,
     );
   }
 
@@ -203,6 +207,8 @@ class ProductSS {
       status: m['status'] as String? ?? 'Pending',
       currency: m['currency'] as String? ?? 'USD',
       approved: m['status']?.toString().toLowerCase() == 'approved',
+      categoryId: m['category_id'] as int?,
+      categoryName: m['category_name'] as String?,
     );
   }
 }
@@ -230,18 +236,17 @@ class StoreRequest {
     required this.status,
   });
 
-  factory StoreRequest.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory StoreRequest.fromJson(Map<String, dynamic> json) {
     return StoreRequest(
-      id: '',
-      ownerUid: doc.id,
-      storeName: data["storeName"] as String? ?? "",
-      storeType: data["storeType"] as String? ?? "",
-      address: data["address"] as String? ?? "",
-      email: data["email"] as String? ?? "",
-      storeIconUrl: data["storeIconUrl"] as String? ?? "",
-      storePhone: data["storePhoneNumber"] as String? ?? "",
-      status: data["status"] as String? ?? "Pending",
+      id: json['id']?.toString() ?? "",
+      ownerUid: json['owner_uid'] as String? ?? "",
+      storeName: json["name"] as String? ?? "",
+      storeType: json["store_type"] as String? ?? "",
+      address: json["address"] as String? ?? "",
+      email: json["email"] as String? ?? "",
+      storeIconUrl: json["icon_url"] as String? ?? "",
+      storePhone: json["phone"] as String? ?? "",
+      status: json["status"] as String? ?? "Pending",
     );
   }
 
@@ -285,16 +290,16 @@ class DeliveryRequest {
     this.createdAt,
   });
 
-  factory DeliveryRequest.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory DeliveryRequest.fromJson(Map<String, dynamic> json) {
     return DeliveryRequest(
-      id: doc.id,
-      name: data["name"] as String? ?? "",
-      email: data["email"] as String? ?? "",
-      phoneNumber: data["phoneNumber"] as String? ?? "N/A",
-      nationalID: data["nationalID"] as String? ?? "N/A",
-      address: data["address"] as String? ?? "N/A",
-      status: data["status"] as String? ?? "Pending",
+      id: json['id']?.toString() ?? "",
+      uid: json["uid"] as String? ?? "",
+      name: json["name"] as String? ?? "",
+      email: json["email"] as String? ?? "",
+      phoneNumber: json["phone"] as String? ?? "N/A",
+      nationalID: json["national_id"] as String? ?? "N/A",
+      address: json["address"] as String? ?? "N/A",
+      status: json["status"] as String? ?? "Pending",
     );
   }
 
@@ -320,11 +325,16 @@ class OrderModel {
   final String storeId;
   final String storeName;
   final double totalPrice;
+  final String currency;
   final String status;
   final String shippingAddress;
   final String paymentMethod;
   final String deliveryOption;
   final String? driverLocation;
+  final String? driverName;
+  final String? driverPhone;
+  final double? driverLatitude;
+  final double? driverLongitude;
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final List<OrderItem> items;
@@ -335,11 +345,16 @@ class OrderModel {
     required this.storeId,
     this.storeName = '',
     required this.totalPrice,
+    this.currency = 'USD',
     required this.status,
     required this.shippingAddress,
     required this.paymentMethod,
     required this.deliveryOption,
     this.driverLocation,
+    this.driverName,
+    this.driverPhone,
+    this.driverLatitude,
+    this.driverLongitude,
     this.createdAt,
     this.updatedAt,
     this.items = const [],
@@ -357,11 +372,16 @@ class OrderModel {
       storeId: (m['store_id'] ?? '').toString(),
       storeName: m['store_name'] as String? ?? '',
       totalPrice: double.tryParse((m['total_price'] ?? '0').toString()) ?? 0.0,
+      currency: (m['currency'] as String? ?? 'USD').toUpperCase(),
       status: m['status'] as String? ?? 'pending',
       shippingAddress: m['shipping_address'] as String? ?? '',
       paymentMethod: m['payment_method'] as String? ?? '',
       deliveryOption: m['delivery_option'] as String? ?? 'Standard',
       driverLocation: m['driver_location'] as String?,
+      driverName: m['driver_name'] as String?,
+      driverPhone: m['driver_phone'] as String?,
+      driverLatitude: m['driver_latitude'] != null ? double.tryParse(m['driver_latitude'].toString()) : null,
+      driverLongitude: m['driver_longitude'] != null ? double.tryParse(m['driver_longitude'].toString()) : null,
       createdAt: m['created_at'] != null ? DateTime.tryParse(m['created_at'].toString()) : null,
       updatedAt: m['updated_at'] != null ? DateTime.tryParse(m['updated_at'].toString()) : null,
       items: orderItems,
@@ -482,8 +502,9 @@ class UserModel {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 class RevenueCalculator {
-  static const double APP_COMMISSION_RATE = 0.25;
-  static const double STORE_OWNER_RATE = 0.75;
+  static const double APP_COMMISSION_RATE = 0.25;  // 25% of total price goes to app/admin
+  static const double DRIVER_RATE = 0.10;           // 10% of total price goes to driver
+  static const double STORE_OWNER_RATE = 0.65;      // 65% of total price goes to store owner (75% - 10% driver)
 
   static double calculateAppRevenue(double totalPrice) {
     return totalPrice * APP_COMMISSION_RATE;
@@ -493,10 +514,15 @@ class RevenueCalculator {
     return totalPrice * STORE_OWNER_RATE;
   }
 
+  static double calculateDriverRevenue(double totalPrice) {
+    return totalPrice * DRIVER_RATE;
+  }
+
   static Map<String, double> calculateOrderRevenue(double totalPrice) {
     return {
       'app': calculateAppRevenue(totalPrice),
       'store': calculateStoreOwnerRevenue(totalPrice),
+      'driver': calculateDriverRevenue(totalPrice),
       'total': totalPrice,
     };
   }
@@ -505,17 +531,20 @@ class RevenueCalculator {
     double totalOrdersValue = 0.0;
     double totalAppRevenue = 0.0;
     double totalStoreRevenue = 0.0;
+    double totalDriverRevenue = 0.0;
 
     for (final order in orders) {
       totalOrdersValue += order.totalPrice;
       totalAppRevenue += calculateAppRevenue(order.totalPrice);
       totalStoreRevenue += calculateStoreOwnerRevenue(order.totalPrice);
+      totalDriverRevenue += calculateDriverRevenue(order.totalPrice);
     }
 
     return {
       'totalOrders': totalOrdersValue,
       'appRevenue': totalAppRevenue,
       'storeRevenue': totalStoreRevenue,
+      'driverRevenue': totalDriverRevenue,
     };
   }
 }

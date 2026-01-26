@@ -6,6 +6,9 @@ export class OrderController {
     try {
       const { limit = 50 } = req.query;
       const orders = await Order.findRecent(parseInt(limit, 10));
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
       res.json({ success: true, data: orders });
     } catch (error) {
       logger.error('Error in getAdminOrders:', error);
@@ -14,11 +17,11 @@ export class OrderController {
   }
   static async create(req, res, next) {
     try {
-      const { storeId, totalPrice, shippingAddress, items, paymentMethod, deliveryOption } = req.body;
-      if (!req.user || !req.user.uid) {
+      const { storeId, totalPrice, shippingAddress, items, paymentMethod, deliveryOption, currency } = req.body;
+      if (!req.user || !req.user.id) {
         return res.status(401).json({ success: false, message: 'Unauthorized: user required' });
       }
-      const userId = req.user.uid;
+      const userId = req.user.id;
 
       const order = await Order.create({
         userId,
@@ -27,6 +30,7 @@ export class OrderController {
         shippingAddress,
         paymentMethod,
         deliveryOption,
+        currency,
         items,
       });
 
@@ -58,13 +62,18 @@ export class OrderController {
         // allowed
       } else {
         // Otherwise require an authenticated Firebase user and check ownership
-        if (!req.user || !req.user.uid) {
+        if (!req.user || !req.user.id) {
           return res.status(401).json({ success: false, message: 'Unauthorized' });
         }
-        if (order.user_id !== req.user.uid) {
+        if (order.user_id !== req.user.id) {
           return res.status(403).json({ success: false, message: 'Forbidden' });
         }
       }
+
+      // Set cache-busting headers
+      res.setHeader('Cache-Control', 'max-age=0, no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
 
       res.json({
         success: true,
@@ -79,10 +88,15 @@ export class OrderController {
   static async getUserOrders(req, res, next) {
     try {
       const { page = 1, limit = 20 } = req.query;
-      if (!req.user || !req.user.uid) {
+      if (!req.user || !req.user.id) {
         return res.status(401).json({ success: false, message: 'Unauthorized: user required' });
       }
-      const userId = req.user.uid;
+      const userId = req.user.id;
+
+      // Set cache-busting headers (same as products/admin endpoints)
+      res.setHeader('Cache-Control', 'max-age=0, no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
 
       const orders = await Order.findByUserId(
         userId,
@@ -112,6 +126,11 @@ export class OrderController {
         return res.status(400).json({ success: false, message: 'Missing storeId' });
       }
 
+      // Set cache-busting headers (same as user orders)
+      res.setHeader('Cache-Control', 'max-age=0, no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+
       const orders = await Order.findByStoreId(storeId, parseInt(page), parseInt(limit));
 
       res.json({ success: true, data: orders, pagination: { page: parseInt(page), limit: parseInt(limit) } });
@@ -136,6 +155,11 @@ export class OrderController {
       }
 
       await Order.updateStatus(id, status);
+
+      // Set cache-busting headers after update
+      res.setHeader('Cache-Control', 'max-age=0, no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
 
       res.json({
         success: true,
@@ -168,18 +192,18 @@ export class OrderController {
     try {
       const { id } = req.params;
       // require authenticated driver
-      if (!req.user || !req.user.uid) return res.status(401).json({ success: false, message: 'Unauthorized' });
-      const driverUid = req.user.uid;
+      if (!req.user || !req.user.id) return res.status(401).json({ success: false, message: 'Unauthorized' });
+      const driverId = req.user.id;
 
       const order = await Order.findById(id);
       if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
 
-      if (!order.driver_id && order.driver_id !== driverUid) {
+      if (!order.driver_id && order.driver_id !== driverId) {
         // If order has no driver or different driver, still allow if driver matches assigned driver
       }
 
       // enforce assigned driver if present
-      if (order.driver_id && order.driver_id !== driverUid) {
+      if (order.driver_id && order.driver_id !== driverId) {
         return res.status(403).json({ success: false, message: 'Forbidden: not assigned driver' });
       }
 
@@ -198,13 +222,13 @@ export class OrderController {
   static async markDelivered(req, res, next) {
     try {
       const { id } = req.params;
-      if (!req.user || !req.user.uid) return res.status(401).json({ success: false, message: 'Unauthorized' });
-      const driverUid = req.user.uid;
+      if (!req.user || !req.user.id) return res.status(401).json({ success: false, message: 'Unauthorized' });
+      const driverId = req.user.id;
 
       const order = await Order.findById(id);
       if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
 
-      if (order.driver_id && order.driver_id !== driverUid) {
+      if (order.driver_id && order.driver_id !== driverId) {
         return res.status(403).json({ success: false, message: 'Forbidden: not assigned driver' });
       }
 

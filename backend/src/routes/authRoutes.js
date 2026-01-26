@@ -1,20 +1,31 @@
 import { Router } from 'express';
 import AuthController from '../controllers/AuthController.js';
-import { verifyFirebaseToken } from '../middleware/auth.js';
+import { verifyJWTToken } from '../middleware/auth.js';
 
 const router = Router();
 
-//  NEW: Logout endpoint for cleanup on backend if needed
-router.post('/logout', verifyFirebaseToken, (req, res) => {
-  // Token-based auth means logout happens client-side (Firebase)
+// Public routes
+router.post('/signup', AuthController.signup);
+router.post('/delivery-signup', AuthController.deliverySignup);
+router.post('/store-signup', AuthController.storeSignup);
+router.post('/login', AuthController.login);
+router.post('/store-login', AuthController.storeLogin);
+router.post('/delivery-login', AuthController.deliveryLogin);
+router.post('/verify-email', AuthController.verifyEmail);
+router.get('/verify-email', AuthController.verifyEmailFromLink);
+
+// Protected routes
+router.get('/me', verifyJWTToken, AuthController.getProfile);
+router.put('/me/password', verifyJWTToken, AuthController.changeMyPassword);
+
+// Logout endpoint for cleanup on backend if needed
+router.post('/logout', verifyJWTToken, (req, res) => {
+  // Token-based auth means logout happens client-side
   // Backend just confirms the logout
   res.json({
     success: true,
-    message: 'Logout successful - clear client cache',
+    message: 'Logout successful',
   });
 });
-
-// Change password for current authenticated user/admin
-router.put('/me/password', verifyFirebaseToken, AuthController.changeMyPassword);
 
 export default router;

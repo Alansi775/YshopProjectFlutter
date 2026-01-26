@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import '../../state_management/auth_manager.dart';
 // يجب استيراد نموذج ProductS من هنا الآن
 import '../../widgets/store_admin_widgets.dart'; 
 import './chat_view.dart';  
+// Chat functionality will be migrated to Backend API
 
 
 //----------------------------------------------------------------------
@@ -19,7 +21,7 @@ class ChatModel {
   final String productImageUrl;
   final String storeOwnerID;
   final String lastMessage;
-  final Timestamp lastMessageTime;
+  final DateTime lastMessageTime;
   final String customerID; 
 
   ChatModel({
@@ -33,21 +35,28 @@ class ChatModel {
     required this.customerID,
   });
 
-  //  تحويل من Firestore
-  factory ChatModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  // تحويل من JSON (Backend API)
+  factory ChatModel.fromJson(Map<String, dynamic> json) {
     return ChatModel(
-      id: doc.id,
-      productID: data['productID'] as String? ?? '',
-      productName: data['productName'] as String? ?? 'Deleted Product',
-      productImageUrl: data['productImageUrl'] as String? ?? '',
-      storeOwnerID: data['storeOwnerID'] as String? ?? '',
-      lastMessage: data['lastMessage'] as String? ?? 'Start a conversation.',
-      customerID: data['customerID'] as String? ?? '',
-      lastMessageTime: data['timestamp'] as Timestamp? ?? Timestamp.now(), 
-      
+      id: json['id']?.toString() ?? '',
+      productID: json['productID'] ?? json['product_id'] ?? '',
+      productName: json['productName'] ?? json['product_name'] ?? 'Deleted Product',
+      productImageUrl: json['productImageUrl'] ?? json['product_image_url'] ?? '',
+      storeOwnerID: json['storeOwnerID'] ?? json['store_owner_id'] ?? '',
+      lastMessage: json['lastMessage'] ?? json['last_message'] ?? 'Start a conversation.',
+      customerID: json['customerID'] ?? json['customer_id'] ?? '',
+      lastMessageTime: _parseDateTime(json['timestamp'] ?? json['last_message_time']) ?? DateTime.now(),
     );
   }
+}
+
+// Helper function to parse DateTime
+DateTime? _parseDateTime(dynamic value) {
+  if (value == null) return null;
+  if (value is DateTime) return value;
+  if (value is String) return DateTime.tryParse(value);
+  if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
+  return null;
 }
 
 
@@ -92,79 +101,23 @@ class ChatListView extends StatelessWidget {
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: maxWidth),
-          child: StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection("chats")
-                .where("storeOwnerID", isEqualTo: storeOwnerID)
-               // .orderBy("timestamp", descending: true) // إذا كان الترتيب يعمل
-                .snapshots(),
-            
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                //  استخدام لون يتناسب مع الثيم
-                return Center(child: CircularProgressIndicator(color: primaryColor));
-              }
-
-              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      //  استخدام secondaryColor بأقل شفافية
-                      Icon(Icons.message, size: 50, color: secondaryColor.withOpacity(0.2)), 
-                      const SizedBox(height: 10),
-                      Text(
-                        "No customer messages yet.",
-                        //  استخدام secondaryColor
-                        style: _getTenorSansStyle(context, 16).copyWith(color: secondaryColor.withOpacity(0.7)),
-                      ),
-                    ],
-                  ),
-                );
-              }
-
-              final chats = snapshot.data!.docs.map((doc) => ChatModel.fromFirestore(doc)).toList();
-
-              return ListView.separated(
-                itemCount: chats.length,
-                //  استخدام Divider يتكيف مع الثيم
-                separatorBuilder: (context, index) => Divider(height: 1, indent: 80, endIndent: 16, color: Theme.of(context).dividerColor),
-                itemBuilder: (context, index) {
-                  final chat = chats[index];
-                  return ChatCard(
-                    chat: chat,
-                    currentUserID: storeOwnerID,
-                    onTap: () {
-                      final product = ProductS(
-                        id: chat.productID,
-                        name: chat.productName,
-                        price: "",
-                        description: "",
-                        imageUrl: chat.productImageUrl,
-                        storeOwnerEmail: chat.storeOwnerID,
-                        storeName: "",
-                        approved: true,
-                        status: "",
-                        storePhone: "",
-                        customerID: chat.customerID,
-                        currency: 'USD',
-                      );
-                      
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => ChatView(
-                            chatID: chat.id,
-                            product: product,
-                            currentUserID: storeOwnerID, 
-                            isStoreOwner: true,
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                },
-              );
-            },
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.message, size: 50, color: secondaryColor.withOpacity(0.2)), 
+                const SizedBox(height: 10),
+                Text(
+                  "Chat feature is being set up.",
+                  style: _getTenorSansStyle(context, 16).copyWith(color: secondaryColor.withOpacity(0.7)),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "Backend API integration in progress",
+                  style: _getTenorSansStyle(context, 12).copyWith(color: secondaryColor.withOpacity(0.5)),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -219,7 +172,7 @@ class ChatCard extends StatelessWidget {
     //  جلب الألوان الديناميكية
     final Color secondaryColor = Theme.of(context).colorScheme.onSurface;
     
-    final formattedTime = _formatTime(chat.lastMessageTime.toDate());
+    final formattedTime = _formatTime(chat.lastMessageTime);
     
     return ListTile(
       onTap: onTap,

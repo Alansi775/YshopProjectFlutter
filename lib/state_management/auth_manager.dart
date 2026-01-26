@@ -1,90 +1,265 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 
-/// Enhanced Auth Manager with Firebase + Backend Integration
+/// Auth Manager with Backend JWT Authentication
+/// No Firebase - all authentication through backend server
 class AuthManager with ChangeNotifier {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  
-  User? _currentUser;
+  static const String _tokenKey = 'jwt_token';
+  static const String _userKey = 'user_profile';
+  static const String _emailVerifiedKey = 'email_verified';
+
+  String? _token;
   Map<String, dynamic>? _userProfile;
   bool _isLoading = false;
   String? _errorMessage;
+  bool _emailVerified = false;
+  DateTime? _lastProfileFetch; // Throttle profile fetch
 
   // Getters
-  User? get currentUser => _currentUser;
+  String? get token => _token;
   Map<String, dynamic>? get userProfile => _userProfile;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
-  bool get isAuthenticated => _currentUser != null;
+  bool get isAuthenticated => _token != null && _emailVerified;
+  bool get isEmailVerified => _emailVerified;
 
   AuthManager() {
-    _auth.authStateChanges().listen(_onAuthStateChanged);
+    // Don't call _loadCachedAuth() here - call initializeAsync() from main() instead
   }
 
-  /// Handle auth state changes
-  Future<void> _onAuthStateChanged(User? user) async {
-    _currentUser = user;
-
-    if (user != null) {
-      // Do not automatically sync every Firebase auth event to backend.
-      // Syncing should be explicit where needed (e.g., after customer signup,
-      // or when an admin approves a store owner). This avoids creating
-      // backend `users` rows for store owner requests before approval.
-      // Attempt to fetch profile (may fail if not yet synced) — errors are caught.
-      await _fetchUserProfile();
-    } else {
-      _userProfile = null;
-    }
-
+  /// Initialize authentication - MUST be called from main() before runApp
+  Future<void> initializeAsync() async {
+    await _loadCachedAuth();
     notifyListeners();
   }
 
-  /// Sync user data with backend after Firebase auth
-  Future<void> _syncUserWithBackend(User user) async {
+  /// Load cached authentication from SharedPreferences
+  Future<void> _loadCachedAuth() async {
     try {
-      await ApiService.syncUser(
-        uid: user.uid,
-        email: user.email ?? '',
-        displayName: user.displayName,
-      );
+      final prefs = await SharedPreferences.getInstance();
+      
+      // FIRST: Try to restore admin token (if admin is logged in)
+      final adminToken = prefs.getString('admin_token');
+      if (adminToken != null) {
+        final adminTokenExpiry = prefs.getInt('admin_token_expiry');
+        debugPrint(' [_loadCachedAuth] Found admin token in SharedPreferences');
+        
+        if (adminTokenExpiry != null) {
+          final expiry = DateTime.fromMillisecondsSinceEpoch(adminTokenExpiry);
+          if (DateTime.now().isBefore(expiry)) {
+            // Restore admin token to ApiService
+            debugPrint(' [_loadCachedAuth] Restoring admin token - expires in ${expiry.difference(DateTime.now()).inMinutes} minutes');
+            // The ApiService._getJwtToken() will automatically find this in SharedPreferences
+            // No need to manually restore it here - it will be picked up on first API call
+          } else {
+            debugPrint(' [_loadCachedAuth] Admin token expired, clearing');
+            await prefs.remove('admin_token');
+            await prefs.remove('admin_token_expiry');
+            await prefs.remove('admin_role');
+            await prefs.remove('admin_profile');
+          }
+        }
+      }
+      
+      _token = prefs.getString(_tokenKey);
+      
+      // If token exists, validate it with backend before using
+      if (_token != null) {
+        //  CRITICAL: Propagate token to ApiService so we can validate it
+        ApiService.setUserToken(_token);
+        
+        // Try to validate the token by calling /auth/me
+        try {
+          debugPrint(' Validating cached token with backend...');
+          final response = await ApiService.getUserProfile();
+          
+          if (response != null) {
+            _emailVerified = true;
+            _userProfile = response;
+            debugPrint(' Token validated successfully');
+            
+            // Save validated profile to SharedPreferences
+            try {
+              final userJson = jsonEncode(response);
+              await prefs.setString(_userKey, userJson);
+            } catch (_) {
+              // Silent fail on save
+            }
+            return; // Success, exit early
+          } else {
+            throw Exception('Profile fetch returned null');
+          }
+        } catch (e) {
+          debugPrint('❌ Token validation failed: $e');
+          // Token is invalid/expired, clear it
+          _token = null;
+          _emailVerified = false;
+          _userProfile = null;
+          // Clear from SharedPreferences
+          await prefs.remove(_tokenKey);
+          await prefs.remove(_userKey);
+          ApiService.setUserToken(null);
+          return;
+        }
+      } else {
+        // No token in SharedPreferences
+        _emailVerified = prefs.getBool(_emailVerifiedKey) ?? false;
+        
+        // Try to load cached profile if no token
+        final userJson = prefs.getString(_userKey);
+        if (userJson != null) {
+          try {
+            _userProfile = jsonDecode(userJson) as Map<String, dynamic>;
+          } catch (_) {
+            _userProfile = null;
+          }
+        }
+      }
+
+      notifyListeners();
     } catch (e) {
-      debugPrint('Error syncing user with backend: $e');
-      // Not critical, user can still use the app
+      debugPrint('Error loading cached auth: $e');
     }
   }
 
-  /// Register new user with Firebase
+  /// Save authentication token and user profile
+  Future<void> _saveAuth(String token, Map<String, dynamic> profile, bool emailVerified) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_tokenKey, token);
+      await prefs.setBool(_emailVerifiedKey, emailVerified);
+
+      // Save user profile as JSON string
+      final userJson = jsonEncode(profile);
+      await prefs.setString(_userKey, userJson);
+
+      _token = token;
+      _userProfile = profile;
+      _emailVerified = emailVerified;
+      
+      //  CRITICAL: Propagate token to ApiService immediately
+      ApiService.setUserToken(token);
+    } catch (e) {
+      debugPrint('Error saving auth: $e');
+    }
+  }
+
+  /// Fetch user profile from backend (throttled to every 5 seconds)
+  Future<void> _fetchUserProfile() async {
+    if (_token == null) return;
+    
+    // Throttle: only fetch if last fetch was > 5 seconds ago
+    final now = DateTime.now();
+    if (_lastProfileFetch != null && 
+        now.difference(_lastProfileFetch!).inSeconds < 5) {
+      return;
+    }
+    _lastProfileFetch = now;
+
+    try {
+      final response = await ApiService.getRequest('/auth/me');
+
+      if (response != null && response['success'] == true) {
+        // Backend returns { success: true, data: {...} }
+        _userProfile = response['data'] ?? response['user'] ?? {};
+        debugPrint(' AuthManager._fetchUserProfile - Updated profile: ${_userProfile?.keys}');
+        _emailVerified = _userProfile?['email_verified'] ?? false;
+        
+        //  CRITICAL: Save profile to SharedPreferences for persistence
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final userJson = jsonEncode(_userProfile);
+          await prefs.setString(_userKey, userJson);
+          debugPrint(' AuthManager._fetchUserProfile - Profile saved to SharedPreferences');
+        } catch (e) {
+          debugPrint('Error saving profile to SharedPreferences: $e');
+        }
+        
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error fetching user profile: $e');
+    }
+  }
+
+  /// Sign up with email and password
   Future<void> register({
     required String email,
     required String password,
     required String displayName,
+    String? phone,
+    String? name,
+    String? surname,
+    String? nationalId,
+    String? address,
+    double? latitude,
+    double? longitude,
+    String? buildingInfo,
+    String? apartmentNumber,
+    String? deliveryInstructions,
   }) async {
     try {
       _isLoading = true;
       _errorMessage = null;
       notifyListeners();
 
-      final userCredential = await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      final response = await ApiService.postRequest('/auth/signup', {
+        'email': email,
+        'password': password,
+        'display_name': displayName,
+        'phone': phone,
+        'name': name,
+        'surname': surname,
+        'national_id': nationalId,
+        'address': address,
+        'latitude': latitude,
+        'longitude': longitude,
+        'building_info': buildingInfo,
+        'apartment_number': apartmentNumber,
+        'delivery_instructions': deliveryInstructions,
+      });
 
-      // Update display name
-      await userCredential.user?.updateDisplayName(displayName);
+      if (response != null && response['success'] == true) {
+        _isLoading = false;
+        _errorMessage = null;
+        notifyListeners();
+        // User registered but needs to verify email
+        return;
+      }
 
-      // Send email verification
-      await userCredential.user?.sendEmailVerification();
-
-      _isLoading = false;
-      notifyListeners();
-    } on FirebaseAuthException catch (e) {
-      _errorMessage = _getFirebaseErrorMessage(e);
+      throw Exception(response?['message'] ?? 'Registration failed');
+    } catch (e) {
+      _errorMessage = 'Registration failed: ${e.toString()}';
       _isLoading = false;
       notifyListeners();
       rethrow;
+    }
+  }
+
+  /// Verify email with token
+  Future<void> verifyEmail({required String token}) async {
+    try {
+      _isLoading = true;
+      _errorMessage = null;
+      notifyListeners();
+
+      final response = await ApiService.postRequest('/auth/verify-email', {
+        'token': token,
+      });
+
+      if (response != null && response['success'] == true) {
+        _isLoading = false;
+        _errorMessage = null;
+        _emailVerified = true;
+        notifyListeners();
+        return;
+      }
+
+      throw Exception(response?['message'] ?? 'Email verification failed');
     } catch (e) {
-      _errorMessage = 'Registration failed: $e';
+      _errorMessage = 'Email verification failed: ${e.toString()}';
       _isLoading = false;
       notifyListeners();
       rethrow;
@@ -101,171 +276,370 @@ class AuthManager with ChangeNotifier {
       _errorMessage = null;
       notifyListeners();
 
-      //  CRITICAL: Clear ALL old cache before signing in a NEW user
+      // Clear cache before signing in
       ApiService.clearCache();
-      ApiService.clearAuthCache();
+      ApiService.clearPendingRequests();
 
-      await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      final response = await ApiService.postRequest('/auth/login', {
+        'email': email,
+        'password': password,
+      });
 
-      _isLoading = false;
-      notifyListeners();
-    } on FirebaseAuthException catch (e) {
-      _errorMessage = _getFirebaseErrorMessage(e);
+      if (response != null && response['success'] == true) {
+        final token = response['token'];
+        final user = response['user'] ?? {};
+
+        if (token == null) {
+          throw Exception('No authentication token received');
+        }
+
+        // Check if email is verified
+        if (response['requiresVerification'] == true) {
+          _errorMessage = 'Please verify your email before logging in';
+          _isLoading = false;
+          notifyListeners();
+          throw Exception('Email not verified');
+        }
+
+        // Save token and user info
+        await _saveAuth(token, user, true);
+
+        _isLoading = false;
+        _errorMessage = null;
+        notifyListeners();
+        return;
+      }
+
+      throw Exception(response?['message'] ?? 'Sign in failed');
+    } on Exception {
       _isLoading = false;
       notifyListeners();
       rethrow;
     } catch (e) {
-      _errorMessage = 'Sign in failed: $e';
+      _errorMessage = 'Sign in failed: ${e.toString()}';
       _isLoading = false;
       notifyListeners();
       rethrow;
     }
   }
 
-  /// Sign out - Comprehensive cleanup
+  /// Delivery Driver Login
+  Future<void> deliveryLogin({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      _isLoading = true;
+      _errorMessage = null;
+      notifyListeners();
+
+      // Clear cache before signing in
+      ApiService.clearCache();
+      ApiService.clearPendingRequests();
+
+      final response = await ApiService.postRequest('/auth/delivery-login', {
+        'email': email,
+        'password': password,
+      });
+
+      if (response != null && response['success'] == true) {
+        final token = response['token'];
+        final user = response['user'] ?? {};
+
+        if (token == null) {
+          throw Exception('No authentication token received');
+        }
+
+        // Check if email is verified
+        if (response['requiresVerification'] == true) {
+          _errorMessage = 'Please verify your email before logging in';
+          _isLoading = false;
+          notifyListeners();
+          throw Exception('Email not verified');
+        }
+
+        // Check if admin approval is pending
+        if (response['requiresApproval'] == true) {
+          _errorMessage = 'Your account is pending admin approval';
+          _isLoading = false;
+          notifyListeners();
+          throw Exception('Pending admin approval');
+        }
+
+        // Save token and user info
+        await _saveAuth(token, user, true);
+
+        _isLoading = false;
+        _errorMessage = null;
+        notifyListeners();
+        return;
+      }
+
+      // Check if the error is about pending approval or verification
+      if (response?['requiresApproval'] == true) {
+        _errorMessage = response?['message'] ?? 'Your account is pending admin approval. Please wait.';
+        _isLoading = false;
+        notifyListeners();
+        throw Exception(_errorMessage);
+      }
+
+      if (response?['requiresVerification'] == true) {
+        _errorMessage = response?['message'] ?? 'Please verify your email before logging in';
+        _isLoading = false;
+        notifyListeners();
+        throw Exception(_errorMessage);
+      }
+
+      throw Exception(response?['message'] ?? 'Login failed');
+    } on Exception {
+      _isLoading = false;
+      notifyListeners();
+      rethrow;
+    } catch (e) {
+      _errorMessage = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  /// Sign out
   Future<void> signOut() async {
     try {
       _isLoading = true;
       _errorMessage = null;
       notifyListeners();
 
-      //  CRITICAL: Clear ALL API caches BEFORE signing out
+      // Clear all cache
       ApiService.clearCache();
-      //  CRITICAL: Clear auth tokens
-      ApiService.clearAuthCache();
-      //  CRITICAL: Admin logout (clears SharedPreferences)
-      ApiService.adminLogout();
-      
-      //  Then sign out from Firebase
-      await _auth.signOut();
+      ApiService.clearPendingRequests();
 
-      _currentUser = null;
+      // Call logout endpoint
+      try {
+        await ApiService.postRequest('/auth/logout', {});
+      } catch (e) {
+        debugPrint('Logout endpoint error (non-critical): $e');
+      }
+
+      // Clear local storage
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_tokenKey);
+      await prefs.remove(_userKey);
+      await prefs.remove(_emailVerifiedKey);
+
+      _token = null;
       _userProfile = null;
+      _emailVerified = false;
       _isLoading = false;
+      
+      //  CRITICAL: Clear token from ApiService on logout
+      ApiService.setUserToken(null);
       notifyListeners();
     } catch (e) {
-      _errorMessage = 'Sign out failed: $e';
+      _errorMessage = 'Sign out failed: ${e.toString()}';
       _isLoading = false;
       notifyListeners();
       rethrow;
-    }
-  }
-
-  /// Reset password
-  Future<void> resetPassword(String email) async {
-    try {
-      _isLoading = true;
-      _errorMessage = null;
-      notifyListeners();
-
-      await _auth.sendPasswordResetEmail(email: email);
-
-      _isLoading = false;
-      notifyListeners();
-    } on FirebaseAuthException catch (e) {
-      _errorMessage = _getFirebaseErrorMessage(e);
-      _isLoading = false;
-      notifyListeners();
-      rethrow;
-    } catch (e) {
-      _errorMessage = 'Failed to reset password: $e';
-      _isLoading = false;
-      notifyListeners();
-      rethrow;
-    }
-  }
-
-  /// Fetch user profile from backend
-  Future<void> _fetchUserProfile() async {
-    if (!isAuthenticated) return;
-
-    try {
-      _userProfile = await ApiService.getUserProfile();
-      notifyListeners();
-    } catch (e) {
-      debugPrint('Error fetching user profile: $e');
-      // Not critical, allow user to proceed
     }
   }
 
   /// Update user profile
   Future<void> updateProfile({
-    String? displayName,
-    String? phone,
-    String? address,
+    required Map<String, dynamic> data,
   }) async {
-    if (!isAuthenticated) throw Exception('User not authenticated');
-
     try {
       _isLoading = true;
       _errorMessage = null;
       notifyListeners();
 
-      _userProfile = await ApiService.updateUserProfile(
-        displayName: displayName,
-        phone: phone,
-        address: address,
-      );
+      final response = await ApiService.putRequest('/auth/me', data);
 
+      if (response != null && response['success'] == true) {
+        _userProfile = response['user'] ?? _userProfile;
+        _isLoading = false;
+        _errorMessage = null;
+        notifyListeners();
+        return;
+      }
+
+      throw Exception(response?['message'] ?? 'Update failed');
+    } catch (e) {
+      _errorMessage = 'Update failed: ${e.toString()}';
       _isLoading = false;
       notifyListeners();
+      rethrow;
+    }
+  }
+
+  /// Change password
+  Future<void> changePassword({
+    required String oldPassword,
+    required String newPassword,
+  }) async {
+    try {
+      _isLoading = true;
+      _errorMessage = null;
+      notifyListeners();
+
+      final response = await ApiService.putRequest('/auth/me/password', {
+        'oldPassword': oldPassword,
+        'newPassword': newPassword,
+      });
+
+      if (response != null && response['success'] == true) {
+        _isLoading = false;
+        _errorMessage = null;
+        notifyListeners();
+        return;
+      }
+
+      throw Exception(response?['message'] ?? 'Password change failed');
     } catch (e) {
-      _errorMessage = 'Update failed: $e';
+      _errorMessage = 'Password change failed: ${e.toString()}';
       _isLoading = false;
       notifyListeners();
       rethrow;
     }
   }
 
-  /// Check if email is verified
-  bool get isEmailVerified => _currentUser?.emailVerified ?? false;
-
-  /// Send email verification
-  Future<void> sendEmailVerification() async {
+  /// Refresh user profile from backend
+  Future<void> refreshUserProfile() async {
+    if (_token == null) return;
     try {
-      await _currentUser?.sendEmailVerification();
+      final response = await ApiService.getRequest('/auth/me');
+      if (response != null && response['success'] == true) {
+        final user = response['user'] ?? {};
+        _userProfile = user;
+        _emailVerified = user['email_verified'] ?? false;
+        
+        // Save updated profile
+        final userJson = jsonEncode(user);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_userKey, userJson);
+        
+        notifyListeners();
+      }
     } catch (e) {
-      _errorMessage = 'Failed to send verification email: $e';
+      debugPrint('Error refreshing user profile: $e');
+    }
+  }
+
+  /// Clear error message
+  void clearError() {
+    _errorMessage = null;
+    notifyListeners();
+  }
+
+  /// Update cached profile from fresh API data (used by SettingsView after fetching)
+  void updateCachedProfile(Map<String, dynamic> profile) {
+    _userProfile = profile;
+    // Also save to SharedPreferences for persistence
+    Future.microtask(() async {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final userJson = jsonEncode(profile);
+        await prefs.setString(_userKey, userJson);
+      } catch (_) {}
+    });
+    notifyListeners();
+  }
+
+  /// Store Owner Sign Up
+  /// Creates account in 'stores' table (not users table)
+  /// Sets status='pending' and requires admin approval before login
+  Future<void> storeSignup({
+    required String email,
+    required String password,
+    required String storeName,
+    required String storeType,
+    required String phone,
+    required String address,
+    required double latitude,
+    required double longitude,
+    String? ownerName,
+  }) async {
+    try {
+      _isLoading = true;
+      _errorMessage = null;
+      notifyListeners();
+
+      final response = await ApiService.postRequest('/auth/store-signup', {
+        'email': email,
+        'password': password,
+        'storeName': storeName,
+        'storeType': storeType,
+        'phone': phone,
+        'address': address,
+        'latitude': latitude,
+        'longitude': longitude,
+      });
+
+      if (response != null && response['success'] == true) {
+        _isLoading = false;
+        _errorMessage = null;
+        notifyListeners();
+        // Store owner registered but needs to:
+        // 1. Verify email (24 hours)
+        // 2. Wait for admin approval
+        return;
+      }
+
+      throw Exception(response?['message'] ?? 'Store registration failed');
+    } catch (e) {
+      _errorMessage = 'Store registration failed: ${e.toString()}';
+      _isLoading = false;
       notifyListeners();
       rethrow;
     }
   }
 
-  /// Reload user data
-  Future<void> reloadUser() async {
+  /// Store Owner Sign In
+  /// Checks: email verified + status='approved'
+  Future<void> storeLogin({
+    required String email,
+    required String password,
+  }) async {
     try {
-      await _currentUser?.reload();
-      _currentUser = _auth.currentUser;
+      _isLoading = true;
+      _errorMessage = null;
       notifyListeners();
-    } catch (e) {
-      _errorMessage = 'Failed to reload user: $e';
+
+      // Clear cache before signing in
+      ApiService.clearCache();
+      ApiService.clearPendingRequests();
+
+      final response = await ApiService.postRequest('/auth/store-login', {
+        'email': email,
+        'password': password,
+      });
+
+      if (response != null && response['success'] == true) {
+        final token = response['token'];
+        final user = response['user'] ?? response['data'] ?? {};
+
+        if (token == null) {
+          throw Exception('No authentication token received');
+        }
+
+        // Save token and user info with storeOwner role
+        await _saveAuth(token, user, true);
+
+        _isLoading = false;
+        _errorMessage = null;
+        notifyListeners();
+        return;
+      }
+
+      throw Exception(response?['message'] ?? 'Store login failed');
+    } on Exception {
+      _isLoading = false;
       notifyListeners();
       rethrow;
-    }
-  }
-
-  /// Get Firebase error message
-  String _getFirebaseErrorMessage(FirebaseAuthException e) {
-    switch (e.code) {
-      case 'user-not-found':
-        return 'User not found';
-      case 'wrong-password':
-        return 'Invalid password';
-      case 'email-already-in-use':
-        return 'Email already in use';
-      case 'weak-password':
-        return 'Password is too weak';
-      case 'invalid-email':
-        return 'Invalid email address';
-      case 'operation-not-allowed':
-        return 'Operation not allowed';
-      case 'too-many-requests':
-        return 'Too many requests. Please try again later';
-      default:
-        return e.message ?? 'Authentication failed';
+    } catch (e) {
+      _errorMessage = 'Store login failed: ${e.toString()}';
+      _isLoading = false;
+      notifyListeners();
+      rethrow;
     }
   }
 }

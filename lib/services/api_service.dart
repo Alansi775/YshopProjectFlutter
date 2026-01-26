@@ -3,7 +3,6 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io' show Platform;
 import 'dart:async';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 
@@ -83,7 +82,7 @@ class ApiService {
 
   // ==================== AUTHENTICATION ====================
 
-  /// Cached token to reduce Firebase calls
+  /// Cached JWT token from backend database
   static String? _cachedToken;
   static DateTime? _tokenExpiry;
   // Admin JWT cached separately
@@ -94,6 +93,18 @@ class ApiService {
   
   /// ValueNotifier to track admin role changes for UI updates
   static final ValueNotifier<String?> adminRoleNotifier = ValueNotifier<String?>(null);
+
+  /// Set user JWT token from AuthManager
+  static void setUserToken(String? token) {
+    _cachedToken = token;
+    if (token != null) {
+      _tokenExpiry = DateTime.now().add(const Duration(days: 7));
+      debugPrint(' Token set in ApiService (length: ${token.length})');
+    } else {
+      _tokenExpiry = null;
+      debugPrint(' Token cleared from ApiService');
+    }
+  }
 
   /// Expose cached admin role (if available)
   static String? get cachedAdminRole {
@@ -129,13 +140,16 @@ class ApiService {
     }
   }
 
-  static Future<String?> _getFirebaseToken() async {
+  /// Get JWT token from cache or SharedPreferences
+  static Future<String?> _getJwtToken() async {
     try {
       // Prefer a cached admin JWT when available (admin sessions)
       if (_cachedAdminToken != null && _cachedAdminTokenExpiry != null) {
         if (DateTime.now().isBefore(_cachedAdminTokenExpiry!.subtract(const Duration(minutes: 1)))) {
+          debugPrint(' [_getJwtToken] Using cached admin token from memory');
           return _cachedAdminToken;
         } else {
+          debugPrint(' [_getJwtToken] Admin token expired, clearing');
           _cachedAdminToken = null;
           _cachedAdminTokenExpiry = null;
         }
@@ -146,9 +160,11 @@ class ApiService {
         final prefs = await SharedPreferences.getInstance();
         final savedToken = prefs.getString('admin_token');
         final savedExpiry = prefs.getInt('admin_token_expiry');
+        debugPrint(' [_getJwtToken] Checking SharedPreferences for admin_token: ${savedToken != null ? "✓ FOUND" : "✗ NOT FOUND"}');
         if (savedToken != null && savedExpiry != null) {
           final expiry = DateTime.fromMillisecondsSinceEpoch(savedExpiry);
           if (DateTime.now().isBefore(expiry)) {
+            debugPrint(' [_getJwtToken] Restored admin token from SharedPreferences');
             _cachedAdminToken = savedToken;
             _cachedAdminTokenExpiry = expiry;
             final profileJson = prefs.getString('admin_profile');
@@ -161,27 +177,33 @@ class ApiService {
             return _cachedAdminToken;
           }
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint(' [_getJwtToken] Error restoring admin token: $e');
+      }
 
-      // Return cached Firebase token if still valid (with 5 min buffer)
-      if (_cachedToken != null &&
-          _tokenExpiry != null &&
-          DateTime.now().isBefore(_tokenExpiry!.subtract(const Duration(minutes: 5)))) {
+      // Return cached JWT token if still valid (with 5 min buffer)
+      if (_cachedToken != null && _tokenExpiry != null) {
+        if (DateTime.now().isBefore(_tokenExpiry!.subtract(const Duration(minutes: 5)))) {
+          debugPrint(' [_getJwtToken] Using cached JWT token from memory');
+          return _cachedToken;
+        }
+      }
+
+      // If cached token is expired or no expiry info, try to reload from SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('jwt_token');
+      if (token != null && token.isNotEmpty) {
+        _cachedToken = token;
+        // Reset expiry to 7 days from now
+        _tokenExpiry = DateTime.now().add(const Duration(days: 7));
+        debugPrint(' [_getJwtToken] Loaded JWT token from SharedPreferences');
         return _cachedToken;
       }
 
-      // If no admin token, try Firebase user token (current user)
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        final tokenResult = await user.getIdTokenResult(true);
-        _cachedToken = tokenResult.token;
-        _tokenExpiry = tokenResult.expirationTime;
-        return _cachedToken;
-      }
-
+      debugPrint(' [_getJwtToken] No JWT token available');
       return null;
     } catch (e) {
-      debugPrint('Error getting Firebase token: $e');
+      debugPrint('Error getting JWT token: $e');
       _cachedToken = null;
       _tokenExpiry = null;
       return null;
@@ -195,6 +217,99 @@ class ApiService {
     _cachedAdminToken = null;
     _cachedAdminTokenExpiry = null;
     _cachedAdminProfile = null;
+  }
+
+  // ==================== GENERIC REQUEST METHODS ====================
+
+  /// Generic GET request with JWT authentication
+  static Future<dynamic> getRequest(String endpoint) async {
+    try {
+      final token = await _getJwtToken();
+      final url = Uri.parse('$_baseUrl$endpoint');
+
+      final response = await _httpClient
+          .get(
+            url,
+            headers: {
+              'Content-Type': 'application/json',
+              if (token != null) 'Authorization': 'Bearer $token',
+            },
+          )
+          .timeout(_timeout);
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else if (response.statusCode == 401) {
+        throw Exception('Unauthorized: Invalid or expired token');
+      } else {
+        throw Exception('Error: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('GET $endpoint error: $e');
+      rethrow;
+    }
+  }
+
+  /// Generic POST request with JWT authentication
+  static Future<dynamic> postRequest(String endpoint, Map<String, dynamic> body) async {
+    try {
+      final token = await _getJwtToken();
+      final url = Uri.parse('$_baseUrl$endpoint');
+
+      final response = await _httpClient
+          .post(
+            url,
+            headers: {
+              'Content-Type': 'application/json',
+              if (token != null) 'Authorization': 'Bearer $token',
+            },
+            body: jsonEncode(body),
+          )
+          .timeout(_timeout);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return jsonDecode(response.body);
+      } else if (response.statusCode == 401) {
+        throw Exception('Unauthorized: Invalid or expired token');
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['message'] ?? 'Error: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('POST $endpoint error: $e');
+      rethrow;
+    }
+  }
+
+  /// Generic PUT request with JWT authentication
+  static Future<dynamic> putRequest(String endpoint, Map<String, dynamic> body) async {
+    try {
+      final token = await _getJwtToken();
+      final url = Uri.parse('$_baseUrl$endpoint');
+
+      final response = await _httpClient
+          .put(
+            url,
+            headers: {
+              'Content-Type': 'application/json',
+              if (token != null) 'Authorization': 'Bearer $token',
+            },
+            body: jsonEncode(body),
+          )
+          .timeout(_timeout);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return jsonDecode(response.body);
+      } else if (response.statusCode == 401) {
+        throw Exception('Unauthorized: Invalid or expired token');
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['message'] ?? 'Error: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('PUT $endpoint error: $e');
+      rethrow;
+    }
   }
 
   // Admin/staff login - tries admin then staff automatically when role='auto'
@@ -254,10 +369,12 @@ class ApiService {
             await prefs.setString('admin_token', _cachedAdminToken!);
             await prefs.setInt('admin_token_expiry', _cachedAdminTokenExpiry!.millisecondsSinceEpoch);
             await prefs.setString('admin_role', actualRole);
+            debugPrint(' [adminLogin] Admin token saved to SharedPreferences. Role: $actualRole');
             if (profile != null) {
               final profileJson = jsonEncode(profile);
               await prefs.setString('admin_profile', profileJson);
               _cachedAdminProfile = Map<String, dynamic>.from(profile);
+              debugPrint(' [adminLogin] Admin profile saved: ${profile['email']}');
             }
           } catch (_) {}
 
@@ -349,13 +466,13 @@ class ApiService {
 
     // Deduplicate concurrent identical requests (unless skipDedup is true)
     if (!skipDedup && _pendingRequests.containsKey(requestKey)) {
-      debugPrint('🔄 Deduplicating request: $requestKey');
+      debugPrint(' Deduplicating request: $requestKey');
       return _pendingRequests[requestKey];
     }
 
     // If skipDedup is true, remove any existing pending request to force fresh fetch
     if (skipDedup && _pendingRequests.containsKey(requestKey)) {
-      debugPrint('🔄 Removing pending duplicate for fresh request: $requestKey');
+      debugPrint(' Removing pending duplicate for fresh request: $requestKey');
       _pendingRequests.remove(requestKey);
     }
 
@@ -397,10 +514,12 @@ class ApiService {
     };
 
     if (requiresAuth) {
-      final token = await _getFirebaseToken();
+      final token = await _getJwtToken();
       if (token != null) {
         requestHeaders['Authorization'] = 'Bearer $token';
+        debugPrint(' [_executeRequest] $method $endpoint - Token added to headers (${token.substring(0, 20)}...)');
       } else {
+        debugPrint('❌ [_executeRequest] $method $endpoint - No token available!');
         throw ApiException('Unauthorized: No valid token', statusCode: 401);
       }
     }
@@ -514,9 +633,10 @@ class ApiService {
   static Future<List<dynamic>> getStoreProductsById(String storeId, {bool bypassCache = false}) async {
     // ⚠️ CRITICAL: Products change frequently (approval/rejection), so disable cache
     // to ensure customers always see latest products
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
     final response = await _request(
       'GET',
-      '/products?storeId=$storeId',
+      '/products?storeId=$storeId&t=$timestamp',
       requiresAuth: false,
       useCache: false,  //  NO CACHE - products change too frequently
       cacheTtl: 0,
@@ -590,7 +710,7 @@ class ApiService {
     final url = Uri.parse('$_baseUrl/products');
     final request = http.MultipartRequest('POST', url);
 
-    final token = await _getFirebaseToken();
+    final token = await _getJwtToken();
     if (token != null) {
       request.headers['Authorization'] = 'Bearer $token';
     }
@@ -677,8 +797,8 @@ class ApiService {
 
   static Future<dynamic> getUserStore({String? uid}) async {
     try {
-      String? queryUid = uid ?? FirebaseAuth.instance.currentUser?.uid;
-      final endpoint = queryUid != null ? '/users/store?uid=$queryUid' : '/users/store';
+      // uid parameter is provided, or API will use current user from JWT
+      final endpoint = uid != null ? '/users/store?uid=$uid' : '/users/store';
       final response = await _request('GET', endpoint);
       return response['data'];
     } catch (e) {
@@ -774,6 +894,7 @@ class ApiService {
     required List<Map<String, dynamic>> items,
     String? paymentMethod,
     String? deliveryOption,
+    String? currency,
   }) async {
     final response = await _request('POST', '/orders', body: {
       'storeId': storeId,
@@ -782,12 +903,19 @@ class ApiService {
       'items': items,
       if (paymentMethod != null) 'paymentMethod': paymentMethod,
       if (deliveryOption != null) 'deliveryOption': deliveryOption,
+      if (currency != null) 'currency': currency,
     });
     return response['data'];
   }
 
   static Future<List<dynamic>> getUserOrders({int page = 1, int limit = 20}) async {
-    final response = await _request('GET', '/orders/user/orders?page=$page&limit=$limit');
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final response = await _request(
+      'GET',
+      '/orders/user/orders?page=$page&limit=$limit&t=$timestamp',
+      useCache: false,
+      cacheTtl: 0,
+    );
     return List<dynamic>.from(response['data'] ?? []);
   }
 
@@ -796,17 +924,24 @@ class ApiService {
     int page = 1,
     int limit = 50,
   }) async {
-    final response = await _request('GET', '/orders/store/$storeId?page=$page&limit=$limit');
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final response = await _request(
+      'GET',
+      '/orders/store/$storeId?page=$page&limit=$limit&t=$timestamp',
+      useCache: false,
+      cacheTtl: 0,
+    );
     return List<dynamic>.from(response['data'] ?? []);
   }
 
   static Future<dynamic> getOrderById(String orderId, {bool requiresAuth = false}) async {
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
     final response = await _request(
       'GET',
-      '/orders/$orderId',
+      '/orders/$orderId?t=$timestamp',
       requiresAuth: requiresAuth,
-      useCache: true,
-      cacheTtl: 10,
+      useCache: false,
+      cacheTtl: 0,
     );
     return response['data'];
   }
@@ -889,10 +1024,12 @@ class ApiService {
   static Future<dynamic> getUserProfile() async {
     final response = await _request(
       'GET',
-      '/users/profile',
+      '/auth/me',
+      requiresAuth: true,
       useCache: true,
       cacheTtl: 120,
     );
+    // Backend returns { success: true, data: {...} }
     return response['data'];
   }
 
@@ -939,6 +1076,30 @@ class ApiService {
     return response['data'];
   }
 
+  static Future<dynamic> deliverySignup({
+    required String email,
+    required String password,
+    required String name,
+    required String phone,
+    String? nationalID,
+    String? address,
+  }) async {
+    final response = await _request(
+      'POST',
+      '/auth/delivery-signup',
+      body: {
+        'email': email,
+        'password': password,
+        'name': name,
+        'phone': phone,
+        if (nationalID != null && nationalID.isNotEmpty) 'nationalID': nationalID,
+        if (address != null && address.isNotEmpty) 'address': address,
+      },
+      requiresAuth: false,
+    );
+    return response;
+  }
+
   static Future<dynamic> submitDeliveryRequest({
     required String uid,
     String? email,
@@ -967,33 +1128,39 @@ class ApiService {
   // ==================== DELIVERY REQUESTS (ADMIN) ====================
 
   static Future<List<dynamic>> getPendingDeliveryRequests() async {
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
     final response = await _request(
       'GET',
-      '/delivery-requests/pending',
+      '/admins/drivers/pending?t=$timestamp',
       requiresAuth: true,
       useCache: false,
+      skipDedup: true,
     );
     return List<dynamic>.from(response['data'] ?? []);
   }
 
   // Admin: fetch approved delivery requests
   static Future<List<dynamic>> getApprovedDeliveryRequests() async {
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
     final response = await _request(
       'GET',
-      '/delivery-requests/approved',
+      '/admins/drivers/approved?t=$timestamp',
       requiresAuth: true,
       useCache: false,
+      skipDedup: true,
     );
     return List<dynamic>.from(response['data'] ?? []);
   }
 
   // Admin: fetch active drivers (working)
   static Future<List<dynamic>> getActiveDeliveryRequests() async {
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
     final response = await _request(
       'GET',
-      '/delivery-requests/active',
+      '/admins/drivers/active?t=$timestamp',
       requiresAuth: true,
       useCache: false,
+      skipDedup: true,
     );
     return List<dynamic>.from(response['data'] ?? []);
   }
@@ -1072,35 +1239,65 @@ class ApiService {
   }
 
   static Future<bool> approveDeliveryRequest(String id) async {
-    await _request('PUT', '/delivery-requests/$id/approve', requiresAuth: true);
+    await _request('POST', '/admins/drivers/$id/approve', requiresAuth: true);
     return true;
   }
 
   static Future<bool> rejectDeliveryRequest(String id) async {
-    await _request('PUT', '/delivery-requests/$id/reject', requiresAuth: true);
+    await _request('POST', '/admins/drivers/$id/reject', requiresAuth: true);
+    return true;
+  }
+
+  static Future<bool> banDeliveryRequest(String id) async {
+    await _request('POST', '/admins/drivers/$id/ban', requiresAuth: true);
     return true;
   }
 
   static Future<Map<String, dynamic>?> getDeliveryRequestByUid(String uid) async {
     // First try dedicated endpoint for current user (server verifies Firebase token)
     try {
+      debugPrint(' [getDeliveryRequestByUid] Trying /delivery-requests/me endpoint');
       final resp = await _request('GET', '/delivery-requests/me', requiresAuth: true);
       final data = resp['data'];
-      if (data != null) return Map<String, dynamic>.from(data as Map);
-    } catch (_) {
+      if (data != null) {
+        debugPrint(' [getDeliveryRequestByUid] Got profile from /me endpoint');
+        return Map<String, dynamic>.from(data as Map);
+      }
+    } catch (e) {
+      debugPrint('⚠️ [getDeliveryRequestByUid] /me endpoint failed: $e');
       // ignore and fallback to admin endpoints
     }
 
-    // Fallback: backend doesn't have a dedicated GET /:uid endpoint on older servers;
-    // fetch pending list (admin-only) and filter by uid as a last resort.
+    // Fallback 1: Try to fetch approved drivers list and filter by uid
     try {
-      final response = await _request('GET', '/delivery-requests/pending', requiresAuth: true);
+      debugPrint(' [getDeliveryRequestByUid] Trying /admins/drivers/approved endpoint');
+      final response = await _request('GET', '/admins/drivers/approved', requiresAuth: true, useCache: false);
       final list = List<dynamic>.from(response['data'] ?? []);
       final found = list.firstWhere((e) => (e['uid'] ?? e['UID'] ?? '') == uid, orElse: () => null);
-      return found as Map<String, dynamic>?;
+      if (found != null) {
+        debugPrint(' [getDeliveryRequestByUid] Found in approved drivers');
+        return found as Map<String, dynamic>?;
+      }
     } catch (e) {
-      return null;
+      debugPrint('⚠️ [getDeliveryRequestByUid] /approved endpoint failed: $e');
     }
+
+    // Fallback 2: Try pending list
+    try {
+      debugPrint(' [getDeliveryRequestByUid] Trying /delivery-requests/pending endpoint');
+      final response = await _request('GET', '/delivery-requests/pending', requiresAuth: true, useCache: false);
+      final list = List<dynamic>.from(response['data'] ?? []);
+      final found = list.firstWhere((e) => (e['uid'] ?? e['UID'] ?? '') == uid, orElse: () => null);
+      if (found != null) {
+        debugPrint(' [getDeliveryRequestByUid] Found in pending drivers');
+        return found as Map<String, dynamic>?;
+      }
+    } catch (e) {
+      debugPrint('⚠️ [getDeliveryRequestByUid] /pending endpoint failed: $e');
+    }
+
+    debugPrint('❌ [getDeliveryRequestByUid] No profile found for UID: $uid');
+    return null;
   }
 
   static Future<bool> updateDriverWorkingStatus(String uid, bool isWorking) async {
@@ -1138,9 +1335,9 @@ class ApiService {
   // ==================== CART ====================
 
   static Future<List<dynamic>> getCart() async {
-    final token = await _getFirebaseToken();
-    debugPrint('🔑 ApiService.getCart - token exists: ${token != null}');
-    debugPrint('🔑 ApiService.getCart - token length: ${token?.length ?? 0}');
+    final token = await _getJwtToken();
+    debugPrint(' ApiService.getCart - token exists: ${token != null}');
+    debugPrint(' ApiService.getCart - token length: ${token?.length ?? 0}');
     if (token == null) {
       debugPrint('❌ ApiService.getCart - NO TOKEN!');
     }
@@ -1157,15 +1354,15 @@ class ApiService {
 
   /// Get cart with dedup bypass - for after delete/remove operations
   static Future<List<dynamic>> getCartFresh() async {
-    final token = await _getFirebaseToken();
-    debugPrint('🔑 ApiService.getCartFresh - forcing fresh request (bypass dedup)');
+    final token = await _getJwtToken();
+    debugPrint(' ApiService.getCartFresh - forcing fresh request (bypass dedup)');
     if (token == null) {
       debugPrint('❌ ApiService.getCartFresh - NO TOKEN!');
     }
     // Force fresh request by removing pending dedup
     const requestKey = 'GET_/cart';
     _pendingRequests.remove(requestKey);
-    debugPrint('🔄 ApiService.getCartFresh - cleared pending request');
+    debugPrint(' ApiService.getCartFresh - cleared pending request');
     
     final response = await _request('GET', '/cart', requiresAuth: token != null);
     debugPrint(' ApiService.getCartFresh - response: $response');
@@ -1173,7 +1370,7 @@ class ApiService {
   }
 
   static Future<bool> addToCart({required String productId, required int quantity}) async {
-    final token = await _getFirebaseToken();
+    final token = await _getJwtToken();
     await _request(
       'POST',
       '/cart/add',
@@ -1202,9 +1399,11 @@ class ApiService {
 
   //  NEW: Single endpoint for ALL dashboard stats (replaces 6 separate requests!)
   static Future<Map<String, dynamic>> getDashboardStats() async {
+    // Add timestamp to bypass all caching
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
     final response = await _request(
       'GET',
-      '/stores/admin/dashboard-stats',
+      '/stores/admin/dashboard-stats?t=$timestamp',
       requiresAuth: true,
       useCache: false,
     );
@@ -1212,17 +1411,39 @@ class ApiService {
   }
 
   static Future<List<dynamic>> getPendingStores() async {
-    final response = await _request('GET', '/stores/admin/pending', requiresAuth: true);
+    final response = await _request('GET', '/admins/stores/pending', requiresAuth: true, skipDedup: true);
     return List<dynamic>.from(response['data'] ?? []);
   }
 
   static Future<List<dynamic>> getApprovedStores() async {
-    final response = await _request('GET', '/stores/admin/approved', requiresAuth: true);
+    final response = await _request('GET', '/admins/stores/approved', requiresAuth: true, skipDedup: true);
     return List<dynamic>.from(response['data'] ?? []);
   }
 
+  /// 🔥 CRITICAL FIX: Get ALL stores with REAL status from database
+  /// This reads the actual status column, not approval timestamps
+  /// Returns pending, approved, and rejected stores
+  static Future<List<dynamic>> getAllStoresAdmin() async {
+    debugPrint('📡 [getAllStoresAdmin] Fetching all stores from backend...');
+    // Add timestamp to bypass all caching
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final response = await _request(
+      'GET',
+      '/admins/stores/all?t=$timestamp',
+      requiresAuth: true,
+      useCache: false,
+      skipDedup: true,
+    );
+    final stores = List<dynamic>.from(response['data'] ?? []);
+    debugPrint('📡 [getAllStoresAdmin] Received ${stores.length} stores');
+    for (var store in stores) {
+      debugPrint('  - ${store['name']}: ${store['status']}');
+    }
+    return stores;
+  }
+
   static Future<Map<String, dynamic>> approveStoreWithData(String storeId) async {
-    final response = await _request('PUT', '/stores/admin/$storeId/approve', requiresAuth: true);
+    final response = await _request('POST', '/admins/stores/$storeId/approve', requiresAuth: true);
     return {
       'success': true,
       'owner_uid': response['data']?['owner_uid'],
@@ -1231,7 +1452,7 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> rejectStoreWithData(String storeId) async {
-    final response = await _request('PUT', '/stores/admin/$storeId/reject', requiresAuth: true);
+    final response = await _request('POST', '/admins/stores/$storeId/reject', requiresAuth: true);
     return {
       'success': true,
       'owner_uid': response['data']?['owner_uid'],
@@ -1239,17 +1460,21 @@ class ApiService {
   }
 
   static Future<bool> approveStore(String storeId) async {
-    await _request('PUT', '/stores/admin/$storeId/approve', requiresAuth: true);
+    debugPrint('🟢 [approveStore] Sending approval request for store: $storeId');
+    final response = await _request('POST', '/admins/stores/$storeId/approve', requiresAuth: true);
+    debugPrint('🟢 [approveStore] Response: $response');
     return true;
   }
 
   static Future<bool> rejectStore(String storeId) async {
-    await _request('PUT', '/stores/admin/$storeId/reject', requiresAuth: true);
+    debugPrint('🔴 [rejectStore] Sending rejection request for store: $storeId');
+    final response = await _request('POST', '/admins/stores/$storeId/reject', requiresAuth: true);
+    debugPrint('🔴 [rejectStore] Response: $response');
     return true;
   }
 
-  static Future<bool> suspendStore(String storeId) async {
-    await _request('PUT', '/stores/admin/$storeId/suspend', requiresAuth: true);
+  static Future<bool> banStore(String storeId) async {
+    await _request('POST', '/admins/stores/$storeId/ban', requiresAuth: true);
     return true;
   }
 
@@ -1269,21 +1494,24 @@ class ApiService {
   // ==================== ADMIN - PRODUCTS ====================
 
   static Future<List<dynamic>> getPendingProducts() async {
-    final response = await _request('GET', '/products/admin/pending', requiresAuth: true);
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final response = await _request('GET', '/products/admin/pending?t=$timestamp', requiresAuth: true);
     return List<dynamic>.from(response['data'] ?? []);
   }
 
   //  NEW: Get approved products from admin endpoint (includes inactive products)
   static Future<List<dynamic>> getApprovedProducts() async {
-    final response = await _request('GET', '/products/admin/approved', requiresAuth: true);
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final response = await _request('GET', '/products/admin/approved?t=$timestamp', requiresAuth: true);
     return List<dynamic>.from(response['data'] ?? []);
   }
 
   // Admin: fetch all orders (for dashboard overview)
   static Future<List<dynamic>> getAdminOrders({int limit = 50}) async {
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
     final response = await _request(
       'GET',
-      '/orders/admin?limit=$limit',
+      '/orders/admin?limit=$limit&t=$timestamp',
       requiresAuth: true,
       useCache: false,
     );

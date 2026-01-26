@@ -1,6 +1,5 @@
 // lib/screens/delivery_shared.dart
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 🚚 DELIVERY SYSTEM - Shared Models & Widgets
@@ -98,20 +97,21 @@ class DeliveryRequest {
   bool get isApproved => status == 'Approved';
   bool get isOnline => isWorking && isApproved;
 
-  factory DeliveryRequest.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>?;
+  factory DeliveryRequest.fromJson(Map<String, dynamic> json) {
     return DeliveryRequest(
-      id: doc.id,
-      uid: data?['uid'] as String? ?? '',
-      name: data?['name'] as String? ?? '',
-      email: data?['email'] as String? ?? '',
-      phoneNumber: data?['phoneNumber'] as String? ?? 'N/A',
-      nationalID: data?['nationalID'] as String? ?? 'N/A',
-      address: data?['address'] as String? ?? 'N/A',
-      status: data?['status'] as String? ?? 'Pending',
-      isWorking: data?['isWorking'] as bool? ?? false,
-      latitude: _parseDouble(data?['latitude']),
-      longitude: _parseDouble(data?['longitude']),
+      id: (json['id'] ?? '').toString(),
+      uid: json['uid'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      email: json['email'] as String? ?? '',
+      phoneNumber: json['phone'] as String? ?? json['phoneNumber'] as String? ?? 'N/A',
+      nationalID: json['national_id'] as String? ?? json['nationalID'] as String? ?? 'N/A',
+      address: json['address'] as String? ?? 'N/A',
+      status: json['status'] as String? ?? 'Pending',
+      isWorking: (json['is_working'] ?? json['isWorking'] ?? 0) == 1 || json['isWorking'] == true,
+      latitude: _parseDouble(json['latitude'] ?? json['lat']),
+      longitude: _parseDouble(json['longitude'] ?? json['lng'] ?? json['long']),
+      createdAt: _parseDateTime(json['created_at']),
+      updatedAt: _parseDateTime(json['updated_at']),
     );
   }
 
@@ -154,6 +154,7 @@ class Order {
   final String status;
   final String paymentMethod;
   final double total;
+  final String currency;  // e.g., 'TRY', 'USD', 'EUR'
   final List<OrderItem> items;
   
   // Customer location
@@ -202,6 +203,7 @@ class Order {
     required this.status,
     this.paymentMethod = '',
     required this.total,
+    this.currency = 'USD',
     required this.items,
     required this.locationLatitude,
     required this.locationLongitude,
@@ -247,46 +249,7 @@ class Order {
     }
   }
 
-  factory Order.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>?;
 
-    List<OrderItem> loadedItems = (data?['items'] as List?)
-        ?.map((item) => OrderItem.fromJson(item as Map<String, dynamic>))
-        .toList() ?? [];
-
-    return Order(
-      id: doc.id,
-      oderId: data?['user_id']?.toString() ?? '',
-      storeId: data?['store_id']?.toString() ?? '',
-      storeName: data?['store_name'] ?? '',
-      userName: data?['userName'] ?? data?['customer']?['name'] ?? 'N/A',
-      userPhone: data?['userPhone'] ?? data?['customer']?['phone'] ?? 'N/A',
-      userEmail: data?['userEmail'] ?? data?['customer']?['email'] ?? '',
-      addressFull: data?['address_Full'] ?? data?['shipping_address'] ?? 'N/A',
-      addressDeliveryInstructions: data?['address_DeliveryInstructions'] ?? data?['delivery_instructions'] ?? '',
-      addressBuilding: data?['address_Building'] ?? data?['building_info'] ?? '',
-      addressApartment: data?['address_Apartment'] ?? data?['apartment_number'] ?? '',
-      deliveryOption: data?['deliveryOption'] ?? data?['delivery_option'] ?? 'Standard',
-      status: data?['status'] ?? 'Processing',
-      paymentMethod: data?['payment_method'] ?? data?['paymentMethod'] ?? '',
-      total: _parseDouble(data?['total'] ?? data?['total_price']),
-      locationLatitude: _parseDouble(data?['location_Latitude'] ?? data?['customer']?['latitude']),
-      locationLongitude: _parseDouble(data?['location_Longitude'] ?? data?['customer']?['longitude']),
-      storeLatitude: _parseDouble(data?['store_latitude']),
-      storeLongitude: _parseDouble(data?['store_longitude']),
-      items: loadedItems,
-      driverAccepted: data?['driverAccepted'] ?? false,
-      driverId: data?['driverId'] ?? data?['driver_id'],
-      driverLocation: data?['driver_location'] is Map ? Map<String, dynamic>.from(data!['driver_location']) : null,
-      currentOfferDriverId: data?['current_offer_driver_id'],
-      offerExpiresAt: _parseDateTime(data?['offer_expires_at']),
-      skippedDriverIds: List<String>.from(data?['skipped_driver_ids'] ?? []),
-      customer: data?['customer'] is Map ? Map<String, dynamic>.from(data!['customer']) : null,
-      customerPhone: data?['customer']?['phone'] ?? data?['userPhone'],
-      createdAt: _parseDateTime(data?['created_at'] ?? data?['createdAt']),
-      updatedAt: _parseDateTime(data?['updated_at'] ?? data?['updatedAt']),
-    );
-  }
 
   factory Order.fromJson(Map<String, dynamic> json) {
     final itemsJson = (json['items'] as List?) ?? [];
@@ -299,13 +262,13 @@ class Order {
 
     return Order(
       id: json['id']?.toString() ?? '',
-      oderId: json['user_id']?.toString() ?? '',
-      storeId: json['store_id']?.toString() ?? '',
+      oderId: json['user_id']?.toString() ?? json['userId']?.toString() ?? '',
+      storeId: json['store_id']?.toString() ?? json['storeId']?.toString() ?? '',
       storeName: json['store_name'] ?? json['storeName'] ?? '',
       userName: json['customer']?['name'] ?? json['userName'] ?? json['customerName'] ?? '',
       userPhone: json['customer']?['phone'] ?? json['userPhone'] ?? json['customerPhone'] ?? '',
       userEmail: json['customer']?['email'] ?? json['userEmail'] ?? '',
-      addressFull: json['shipping_address'] ?? json['address_Full'] ?? '',
+      addressFull: json['shipping_address'] ?? json['address_Full'] ?? json['address'] ?? '',
       addressDeliveryInstructions: json['delivery_instructions'] ?? json['deliveryInstructions'] ?? json['customer']?['delivery_instructions'] ?? '',
       addressBuilding: json['building_info'] ?? json['buildingInfo'] ?? json['customer']?['building_info'] ?? '',
       addressApartment: json['apartment_number'] ?? json['apartmentNumber'] ?? json['customer']?['apartment_number'] ?? '',
@@ -313,6 +276,7 @@ class Order {
       status: json['status'] ?? 'Processing',
       paymentMethod: json['payment_method'] ?? json['paymentMethod'] ?? '',
       total: _parseDouble(json['total'] ?? json['total_price']),
+      currency: json['currency']?.toString() ?? 'USD',
       items: items.cast<OrderItem>(),
       locationLatitude: _parseDouble(json['location_Latitude'] ?? json['customer']?['latitude']),
       locationLongitude: _parseDouble(json['location_Longitude'] ?? json['customer']?['longitude']),
@@ -392,6 +356,7 @@ class OrderOffer {
   final String storeId;
   final String storeName;
   final double totalPrice;
+  final String currency;  // e.g., 'TRY', 'USD', 'EUR'
   final double distanceToStore; // in meters
   final double estimatedEarnings;
   final DateTime expiresAt;
@@ -411,6 +376,7 @@ class OrderOffer {
     required this.storeId,
     required this.storeName,
     required this.totalPrice,
+    this.currency = 'USD',
     required this.distanceToStore,
     required this.estimatedEarnings,
     required this.expiresAt,
@@ -428,6 +394,7 @@ class OrderOffer {
       storeId: json['store_id']?.toString() ?? '',
       storeName: json['store_name'] ?? 'Store',
       totalPrice: _parseDouble(json['total_price']),
+      currency: json['currency']?.toString() ?? 'USD',
       distanceToStore: _parseDouble(json['distance_to_store']),
       estimatedEarnings: _parseDouble(json['estimated_earnings']),
       expiresAt: _parseDateTime(json['expires_at']) ?? DateTime.now().add(const Duration(minutes: 2)),
@@ -631,5 +598,38 @@ extension DeliveryStatusExtension on DeliveryStatus {
       default:
         return DeliveryStatus.pending;
     }
+  }
+}
+
+// Currency formatter
+String getCurrencySymbol(String? currency) {
+  if (currency == null || currency.isEmpty) {
+    return '\$'; // Default to USD
+  }
+  
+  // Remove any whitespace and convert to uppercase
+  final cleanedCurrency = currency.trim().toUpperCase();
+  
+  switch (cleanedCurrency) {
+    case 'USD':
+      return '\$';
+    case 'EUR':
+      return '€';
+    case 'TRY':
+      return '₺';
+    case 'GBP':
+      return '£';
+    case 'JPY':
+      return '¥';
+    case 'INR':
+      return '₹';
+    case 'SAR':
+      return 'ر.س';
+    case 'AED':
+      return 'د.إ';
+    case 'YER':
+      return 'ريال';
+    default:
+      return cleanedCurrency;
   }
 }

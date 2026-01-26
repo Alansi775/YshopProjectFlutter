@@ -6,10 +6,11 @@ import 'package:intl/intl.dart';
 import '../../state_management/cart_manager.dart';
 import 'dart:math';
 import '../../services/api_service.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../../widgets/checkout_item_widget.dart';
 import '../../models/cart_item_model.dart';
 import '../../models/product.dart';
+import 'dart:ui';
+import '../auth/sign_in_ui.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({Key? key}) : super(key: key);
@@ -70,14 +71,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final profile = await ApiService.getUserProfile();
       if (profile != null) customerData = Map<String, dynamic>.from(profile);
     } catch (e) {
-      final authUser = FirebaseAuth.instance.currentUser;
-      if (authUser != null) {
-        customerData = {
-          'name': authUser.displayName ?? '',
-          'email': authUser.email ?? '',
-          'contactNumber': authUser.phoneNumber ?? '',
-        };
-      }
+      // If no profile from API, use empty data - backend will extract from JWT
+      debugPrint('Could not fetch user profile: $e');
     }
 
     // Build full address without N/A
@@ -137,6 +132,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         final double totalPrice =
             itemsForStore.fold(0.0, (sum, it) => sum + (it.product.price * it.quantity));
 
+        // Get currency from the first product (all products from same store should have same currency)
+        String? currency;
+        if (itemsForStore.isNotEmpty && itemsForStore[0].product.currency != null) {
+          currency = itemsForStore[0].product.currency;
+        }
+
         final apiItems = itemsForStore
             .map((it) => {
                   'productId': it.product.id,
@@ -152,6 +153,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           items: apiItems,
           paymentMethod: _selectedPaymentMethod,
           deliveryOption: _deliveryOption,
+          currency: currency,
         );
 
         final createdId = response != null && response['id'] != null ? response['id'].toString() : null;
@@ -179,22 +181,35 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   Widget build(BuildContext context) {
     final cartManager = Provider.of<CartManager>(context);
-    final Color scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
-    final Color primaryColor = Theme.of(context).colorScheme.primary;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     
     // Detect if it's a wide screen (tablet/laptop)
     final bool isWideScreen = MediaQuery.of(context).size.width > 900;
     final double maxWidth = isWideScreen ? 1200 : double.infinity;
 
     return Scaffold(
-      backgroundColor: scaffoldColor,
+      backgroundColor: isDark ? LuxuryTheme.kDarkBackground : LuxuryTheme.kLightBackground,
       appBar: AppBar(
-        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
-        foregroundColor: primaryColor,
-        title: Text("Checkout", style: _getTenorSansStyle(context, 20)),
+        backgroundColor: isDark ? LuxuryTheme.kDarkBackground : LuxuryTheme.kLightBackground,
+        elevation: 0,
+        shadowColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        foregroundColor: isDark ? LuxuryTheme.kPlatinum : LuxuryTheme.kDeepNavy,
+        title: Text(
+          "Checkout",
+          style: TextStyle(
+            fontFamily: 'Didot',
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: isDark ? LuxuryTheme.kPlatinum : LuxuryTheme.kDeepNavy,
+          ),
+        ),
         centerTitle: true,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios, color: primaryColor),
+          icon: Icon(
+            Icons.arrow_back_ios,
+            color: isDark ? LuxuryTheme.kPlatinum : LuxuryTheme.kDeepNavy,
+          ),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -206,7 +221,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               child: ConstrainedBox(
                 constraints: BoxConstraints(maxWidth: maxWidth),
                 child: isWideScreen
-                    ? _buildWideLayout(context, cartManager, primaryColor)
+                    ? _buildWideLayout(context, cartManager)
                     : _buildMobileLayout(context, cartManager),
               ),
             ),
@@ -226,7 +241,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   /// Wide layout: 2-column (left: products, right: delivery/payment/total)
-  Widget _buildWideLayout(BuildContext context, CartManager cartManager, Color primaryColor) {
+  Widget _buildWideLayout(BuildContext context, CartManager cartManager) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -343,16 +358,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildSection(BuildContext context, {required Widget child}) {
-    final Color primaryColor = Theme.of(context).colorScheme.primary;
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
+        color: isDark ? LuxuryTheme.kDarkSurface : LuxuryTheme.kLightSurface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: primaryColor.withOpacity(isDark ? 0.15 : 0.08),
+          color: isDark
+              ? LuxuryTheme.kPlatinum.withOpacity(0.15)
+              : LuxuryTheme.kDeepNavy.withOpacity(0.08),
           width: 1.5,
         ),
         boxShadow: [
@@ -377,7 +393,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildDeliverySection(BuildContext context) {
-    final Color primaryColor = Theme.of(context).colorScheme.primary;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return _buildSection(
       context,
@@ -386,7 +402,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.only(top: 8.0),
-            child: Text("Delivery Method", style: _getTenorSansStyle(context, 18)),
+            child: Text(
+              "Delivery Method",
+              style: TextStyle(
+                fontFamily: 'Didot',
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: isDark ? LuxuryTheme.kPlatinum : LuxuryTheme.kDeepNavy,
+              ),
+            ),
           ),
           const SizedBox(height: 16),
           Row(
@@ -404,11 +428,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildDeliveryOption(BuildContext context, String title, IconData icon) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final bool isSelected = _deliveryOption == title;
-    final Color secondaryBg = Theme.of(context).brightness == Brightness.light
-        ? Colors.grey.shade200
-        : Colors.grey.shade800;
-    final Color primaryColor = Theme.of(context).colorScheme.primary;
+    final Color bgColor = isDark
+        ? LuxuryTheme.kDarkSurface.withOpacity(0.5)
+        : LuxuryTheme.kLightSurface.withOpacity(0.5);
 
     return GestureDetector(
       onTap: () {
@@ -419,19 +443,35 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
         decoration: BoxDecoration(
-          color: secondaryBg,
+          color: bgColor,
           borderRadius: BorderRadius.circular(8),
-          border: isSelected ? Border.all(color: Colors.green, width: 2) : null,
+          border: isSelected
+              ? Border.all(color: Colors.green, width: 2)
+              : Border.all(
+                  color: isDark
+                      ? LuxuryTheme.kPlatinum.withOpacity(0.2)
+                      : LuxuryTheme.kDeepNavy.withOpacity(0.2),
+                ),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 24, color: isSelected ? Colors.green.shade700 : primaryColor),
+            Icon(
+              icon,
+              size: 24,
+              color: isSelected
+                  ? Colors.green.shade700
+                  : (isDark ? LuxuryTheme.kPlatinum : LuxuryTheme.kDeepNavy),
+            ),
             const SizedBox(height: 8),
             Text(
               title,
-              style: _getTenorSansStyle(context, 16,
-                  weight: isSelected ? FontWeight.bold : FontWeight.normal),
+              style: TextStyle(
+                fontFamily: 'TenorSans',
+                fontSize: 16,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isDark ? LuxuryTheme.kPlatinum : LuxuryTheme.kDeepNavy,
+              ),
               textAlign: TextAlign.center,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -443,7 +483,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildPaymentSection(BuildContext context) {
-    final Color primaryColor = Theme.of(context).colorScheme.primary;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return _buildSection(
       context,
@@ -454,13 +494,26 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             padding: const EdgeInsets.only(top: 8.0),
             child: Row(
               children: [
-                Text("Payment Method", style: _getTenorSansStyle(context, 18)),
+                Text(
+                  "Payment Method",
+                  style: TextStyle(
+                    fontFamily: 'Didot',
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? LuxuryTheme.kPlatinum : LuxuryTheme.kDeepNavy,
+                  ),
+                ),
                 const Spacer(),
                 TextButton(
                   onPressed: () => _showPaymentSheet(context),
-                  child: Text("Change",
-                      style: _getTenorSansStyle(context, 14)
-                          .copyWith(color: Theme.of(context).colorScheme.secondary)),
+                  child: Text(
+                    "Change",
+                    style: TextStyle(
+                      fontFamily: 'TenorSans',
+                      fontSize: 14,
+                      color: isDark ? LuxuryTheme.kPlatinum : LuxuryTheme.kDeepNavy,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -469,19 +522,32 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Theme.of(context).brightness == Brightness.light
-                  ? Colors.grey.shade200
-                  : Colors.grey.shade800,
+              color: isDark
+                  ? LuxuryTheme.kDarkSurface.withOpacity(0.5)
+                  : LuxuryTheme.kLightSurface.withOpacity(0.5),
               borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: isDark
+                    ? LuxuryTheme.kPlatinum.withOpacity(0.2)
+                    : LuxuryTheme.kDeepNavy.withOpacity(0.2),
+              ),
             ),
             child: Row(
               children: [
                 Icon(
-                    _selectedPaymentMethod == "Pay at Door" ? Icons.money : Icons.credit_card,
-                    size: 30,
-                    color: primaryColor),
+                  _selectedPaymentMethod == "Pay at Door" ? Icons.money : Icons.credit_card,
+                  size: 30,
+                  color: isDark ? LuxuryTheme.kPlatinum : LuxuryTheme.kDeepNavy,
+                ),
                 const SizedBox(width: 12),
-                Text(_selectedPaymentMethod, style: _getTenorSansStyle(context, 16)),
+                Text(
+                  _selectedPaymentMethod,
+                  style: TextStyle(
+                    fontFamily: 'TenorSans',
+                    fontSize: 16,
+                    color: isDark ? LuxuryTheme.kPlatinum : LuxuryTheme.kDeepNavy,
+                  ),
+                ),
                 const Spacer(),
                 const Icon(Icons.check_circle_sharp, color: Colors.green),
               ],
@@ -494,9 +560,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   void _showPaymentSheet(BuildContext context) {
-    final Color cardColor = Theme.of(context).cardColor;
-    final Color primaryColor = Theme.of(context).colorScheme.primary;
-    final Color onPrimaryColor = Theme.of(context).colorScheme.onPrimary;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final Color cardColor = isDark ? LuxuryTheme.kDarkSurface : LuxuryTheme.kLightSurface;
 
     showModalBottomSheet(
       context: context,
@@ -521,14 +586,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 10),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade400,
+                    color: isDark
+                        ? LuxuryTheme.kPlatinum.withOpacity(0.3)
+                        : LuxuryTheme.kDeepNavy.withOpacity(0.3),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
               Text(
                 "Choose Payment Method",
-                style: _getTenorSansStyle(context, 20),
+                style: TextStyle(
+                  fontFamily: 'Didot',
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? LuxuryTheme.kPlatinum : LuxuryTheme.kDeepNavy,
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
@@ -536,17 +608,43 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               const SizedBox(height: 10),
               _buildPaymentOptionSheet(context, "**** 4242", Icons.credit_card),
               const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryColor,
-                  foregroundColor: onPrimaryColor,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: Text(
-                  "Cancel",
-                  style: _getTenorSansStyle(context, 16).copyWith(color: onPrimaryColor),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? Colors.white.withOpacity(0.08)
+                          : Colors.black.withOpacity(0.05),
+                      border: Border.all(
+                        color: isDark
+                            ? Colors.white.withOpacity(0.15)
+                            : Colors.black.withOpacity(0.1),
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => Navigator.of(context).pop(),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          child: Text(
+                            "Cancel",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontFamily: 'TenorSans',
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? LuxuryTheme.kPlatinum : LuxuryTheme.kDeepNavy,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -557,8 +655,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildPaymentOptionSheet(BuildContext context, String method, IconData icon) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final bool isSelected = _selectedPaymentMethod == method;
-    final Color primaryColor = Theme.of(context).colorScheme.primary;
 
     return GestureDetector(
       onTap: () {
@@ -572,20 +670,36 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         decoration: BoxDecoration(
           color: isSelected
               ? Colors.green.withOpacity(0.1)
-              : (Theme.of(context).brightness == Brightness.light
-                  ? Colors.grey.shade100
-                  : Colors.grey.shade800),
+              : (isDark
+                  ? LuxuryTheme.kDarkSurface.withOpacity(0.5)
+                  : LuxuryTheme.kLightSurface.withOpacity(0.5)),
           borderRadius: BorderRadius.circular(12),
-          border: isSelected ? Border.all(color: Colors.green.shade700, width: 1.5) : null,
+          border: isSelected
+              ? Border.all(color: Colors.green.shade700, width: 1.5)
+              : Border.all(
+                  color: isDark
+                      ? LuxuryTheme.kPlatinum.withOpacity(0.2)
+                      : LuxuryTheme.kDeepNavy.withOpacity(0.2),
+                ),
         ),
         child: Row(
           children: [
-            Icon(icon, size: 24, color: isSelected ? Colors.green.shade700 : primaryColor),
+            Icon(
+              icon,
+              size: 24,
+              color: isSelected
+                  ? Colors.green.shade700
+                  : (isDark ? LuxuryTheme.kPlatinum : LuxuryTheme.kDeepNavy),
+            ),
             const SizedBox(width: 12),
             Text(
               method,
-              style: _getTenorSansStyle(context, 16,
-                  weight: isSelected ? FontWeight.bold : FontWeight.normal),
+              style: TextStyle(
+                fontFamily: 'TenorSans',
+                fontSize: 16,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isDark ? LuxuryTheme.kPlatinum : LuxuryTheme.kDeepNavy,
+              ),
             ),
             const Spacer(),
             if (isSelected) const Icon(Icons.check_circle, color: Colors.green),
@@ -596,8 +710,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildTotalSection(BuildContext context, double subtotal, String currencySymbol) {
-    final Color dividerColor = Theme.of(context).dividerColor;
-    final Color primaryColor = Theme.of(context).colorScheme.primary;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return _buildSection(
       context,
@@ -605,7 +718,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         children: [
           Row(
             children: [
-              Text("Order Summary", style: _getTenorSansStyle(context, 18)),
+              Text(
+                "Order Summary",
+                style: TextStyle(
+                  fontFamily: 'Didot',
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? LuxuryTheme.kPlatinum : LuxuryTheme.kDeepNavy,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -613,7 +734,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           const SizedBox(height: 12),
           _buildTotalRow(context, "Delivery", "Free", isBold: false),
           const SizedBox(height: 12),
-          Divider(height: 1, color: dividerColor),
+          Divider(
+            height: 1,
+            color: isDark
+                ? LuxuryTheme.kPlatinum.withOpacity(0.2)
+                : LuxuryTheme.kDeepNavy.withOpacity(0.2),
+          ),
           const SizedBox(height: 12),
           _buildTotalRow(context, "Total", _formatCurrency(subtotal, currencySymbol: currencySymbol),
               isBold: true, color: Colors.green.shade700),
@@ -625,30 +751,35 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Widget _buildTotalRow(BuildContext context, String label, String value,
       {bool isBold = false, Color? color}) {
-    final Color primaryColor = Theme.of(context).colorScheme.primary;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Row(
       children: [
         Text(
           label,
-          style: _getTenorSansStyle(context, isBold ? 20 : 16,
-              weight: isBold ? FontWeight.bold : FontWeight.normal),
+          style: TextStyle(
+            fontFamily: isBold ? 'Didot' : 'TenorSans',
+            fontSize: isBold ? 20 : 16,
+            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+            color: isDark ? LuxuryTheme.kPlatinum : LuxuryTheme.kDeepNavy,
+          ),
         ),
         const Spacer(),
         Text(
           value,
-          style: _getTenorSansStyle(context, isBold ? 20 : 16,
-                  weight: isBold ? FontWeight.bold : FontWeight.normal)
-              .copyWith(color: color ?? primaryColor),
+          style: TextStyle(
+            fontFamily: isBold ? 'Didot' : 'TenorSans',
+            fontSize: isBold ? 20 : 16,
+            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+            color: color ?? (isDark ? LuxuryTheme.kPlatinum : LuxuryTheme.kDeepNavy),
+          ),
         ),
       ],
     );
   }
 
   Widget _buildConfirmButton(BuildContext context, CartManager cartManager) {
-    final Color primaryColor = Theme.of(context).colorScheme.primary;
-    final Color onPrimaryColor = Theme.of(context).colorScheme.onPrimary;
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -664,38 +795,47 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ),
         ],
       ),
-      child: ElevatedButton(
-        onPressed: cartManager.items.isEmpty
-            ? null
-            : () {
-                _placeOrder(cartManager);
-              },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: primaryColor,
-          foregroundColor: onPrimaryColor,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          elevation: 0,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.shopping_bag_outlined, color: onPrimaryColor, size: 22),
-            const SizedBox(width: 12),
-            Text("Confirm Order",
-                style: _getTenorSansStyle(context, 16, weight: FontWeight.bold)
-                    .copyWith(color: onPrimaryColor, letterSpacing: 0.5)),
-          ],
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Material(
+          color: isDark ? Colors.white : Colors.black,
+          child: InkWell(
+            onTap: cartManager.items.isEmpty
+                ? null
+                : () {
+                    _placeOrder(cartManager);
+                  },
+            borderRadius: BorderRadius.circular(14),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.shopping_bag_outlined,
+                  color: isDark ? Colors.black : Colors.white,
+                  size: 22,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  "Confirm Order",
+                  style: TextStyle(
+                    fontFamily: 'TenorSans',
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.black : Colors.white,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
   void _showConfirmationSheet(BuildContext context, String orderId) {
-    final Color cardColor = Theme.of(context).cardColor;
-    final Color primaryColor = Theme.of(context).colorScheme.primary;
-    final Color onPrimaryColor = Theme.of(context).colorScheme.onPrimary;
-    final Color secondaryColor = Theme.of(context).colorScheme.onSurface;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final Color cardColor = isDark ? LuxuryTheme.kDarkSurface : LuxuryTheme.kLightSurface;
 
     Navigator.of(context).pop();
 
@@ -719,34 +859,77 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               const SizedBox(height: 20),
               Text(
                 "Order Placed Successfully!",
-                style: _getTenorSansStyle(context, 24),
+                style: TextStyle(
+                  fontFamily: 'Didot',
+                  fontSize: 24,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? LuxuryTheme.kPlatinum : LuxuryTheme.kDeepNavy,
+                ),
               ),
               const SizedBox(height: 10),
               Text(
                 "Order ID: #$orderId",
                 textAlign: TextAlign.center,
-                style: _getTenorSansStyle(context, 18)
-                    .copyWith(color: primaryColor, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontFamily: 'TenorSans',
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? LuxuryTheme.kPlatinum : LuxuryTheme.kDeepNavy,
+                ),
               ),
               const SizedBox(height: 10),
               Text(
                 "Your order has been successfully placed via $_deliveryOption delivery. We will notify you when it's ready.\nThank you!",
                 textAlign: TextAlign.center,
-                style:
-                    _getTenorSansStyle(context, 16).copyWith(color: secondaryColor.withOpacity(0.7)),
+                style: TextStyle(
+                  fontFamily: 'TenorSans',
+                  fontSize: 16,
+                  color: isDark
+                      ? LuxuryTheme.kPlatinum.withOpacity(0.6)
+                      : LuxuryTheme.kDeepNavy.withOpacity(0.6),
+                ),
               ),
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? Colors.white.withOpacity(0.08)
+                            : Colors.black.withOpacity(0.05),
+                        border: Border.all(
+                          color: isDark
+                              ? Colors.white.withOpacity(0.15)
+                              : Colors.black.withOpacity(0.1),
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () => Navigator.of(context).pop(),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            child: Text(
+                              "Continue Shopping",
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontFamily: 'TenorSans',
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? LuxuryTheme.kPlatinum : LuxuryTheme.kDeepNavy,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
-                  child: Text("Continue Shopping",
-                      style: _getTenorSansStyle(context, 16).copyWith(color: onPrimaryColor)),
                 ),
               ),
             ],

@@ -1,15 +1,16 @@
 // lib/screens/product_detail_view.dart
 
-import 'dart:ui'; //  (1) هذا هو السطر الناقص لإصلاح ImageFilter
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/product.dart';
 import '../../models/currency.dart';
-import '../../widgets/store_admin_widgets.dart'; 
 import '../../state_management/cart_manager.dart';
+import '../../state_management/auth_manager.dart';
+import '../../services/api_service.dart';
 import '../../widgets/centered_notification.dart';
+import '../../widgets/store_admin_widgets.dart';
 import '../stores/chat_view.dart';
 
 // دالة للحصول على رمز العملة الصحيح
@@ -98,27 +99,34 @@ class _ProductDetailViewState extends State<ProductDetailView> {
 
   // --- Actions ---
   void _startChat() {
-    final String? currentUserID = FirebaseAuth.instance.currentUser?.uid; 
-    if (currentUserID == null) {
-      CenteredNotification.show(context, 'Please sign in to start a chat.', success: false);
+    // Start chat with store owner - JWT authenticated
+    if (widget.product.storeOwnerEmail == null || widget.product.storeOwnerEmail!.isEmpty) {
+      CenteredNotification.show(context, 'Store owner email not available.', success: false);
       return;
     }
     
-    final ProductS chatProduct = ProductS.fromProduct(widget.product);
-    final String customerOrUID = currentUserID;
-    final String storeOwnerEmail = widget.product.storeOwnerEmail ?? 'N/A';
+    final authManager = Provider.of<AuthManager>(context, listen: false);
+    if (!authManager.isAuthenticated) {
+      CenteredNotification.show(context, 'Please login to start a chat.', success: false);
+      return;
+    }
     
-    final List<String> participants = [customerOrUID, storeOwnerEmail];
-    participants.sort();
-    final String chatID = '${participants[0]}_${participants[1]}_${widget.product.id}';
+    final String currentUserID = authManager.userProfile?['email'] ?? authManager.userProfile?['uid'] ?? '';
+    if (currentUserID.isEmpty) {
+      CenteredNotification.show(context, 'Unable to identify user.', success: false);
+      return;
+    }
+    
+    final String storeOwnerEmail = widget.product.storeOwnerEmail ?? 'N/A';
+    final String chatID = '${currentUserID}_${storeOwnerEmail}_${widget.product.id}';
 
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => ChatView(
           chatID: chatID,
-          product: chatProduct, 
-          currentUserID: currentUserID, 
-          isStoreOwner: false, 
+          product: ProductS.fromProduct(widget.product),
+          currentUserID: currentUserID,
+          isStoreOwner: false,
         ),
       ),
     );
@@ -199,7 +207,7 @@ class _ProductDetailViewState extends State<ProductDetailView> {
                           child: Container(color: Colors.black.withOpacity(0.3)),
                         ),
                       ),
-                      // 🎯 Main Product Image (Hero Animation) - Clickable
+                      //  Main Product Image (Hero Animation) - Clickable
                       Center(
                         child: GestureDetector(
                           onTap: () => _showImageFullScreen(isDark),

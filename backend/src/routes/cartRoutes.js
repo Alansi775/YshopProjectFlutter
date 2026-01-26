@@ -11,8 +11,12 @@ router.use(verifyFirebaseToken);
 // Get user cart
 router.get('/', async (req, res, next) => {
   try {
-    const userId = req.user?.uid;
+    const userId = req.user?.id;
     logger.info('Get cart request', { userId, hasUser: !!req.user, userKeys: Object.keys(req.user || {}) });
+    
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized: No user ID' });
+    }
     
     // 🔥 CRITICAL: Disable HTTP caching for real-time cart data
     res.set({
@@ -37,7 +41,7 @@ router.get('/', async (req, res, next) => {
 // Add item to cart
 router.post('/add', async (req, res, next) => {
   try {
-    const userId = req.user.uid;
+    const userId = req.user.id;  // Now contains uid (not numeric id)
     const { productId, quantity } = req.body;
     logger.info(`Add to cart request received`, { userId, body: req.body });
 
@@ -63,7 +67,7 @@ router.post('/add', async (req, res, next) => {
 // Update cart item quantity
 router.put('/item/:itemId', async (req, res, next) => {
   try {
-    const userId = req.user.uid;
+    const userId = req.user.id;
     const { itemId } = req.params;
     const { quantity } = req.body;
 
@@ -89,7 +93,7 @@ router.put('/item/:itemId', async (req, res, next) => {
 // Remove item from cart
 router.delete('/item/:itemId', async (req, res, next) => {
   try {
-    const userId = req.user.uid;
+    const userId = req.user.id;
     const { itemId } = req.params;
     
     logger.info('Delete cart item request', { userId, itemId });
@@ -109,7 +113,7 @@ router.delete('/item/:itemId', async (req, res, next) => {
 // Clear cart
 router.delete('/', async (req, res, next) => {
   try {
-    const userId = req.user.uid;
+    const userId = req.user.id;
 
     await Cart.clearCart(userId);
 

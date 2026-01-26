@@ -107,9 +107,21 @@ export class DeliveryRequest {
   static async updateLocationByUid(uid, latitude, longitude) {
     try {
       const connection = await pool.getConnection();
+      
+      // Validate inputs
+      if (!uid) throw new Error('uid is required');
+      const lat = parseFloat(latitude);
+      const lng = parseFloat(longitude);
+      
+      if (isNaN(lat) || isNaN(lng)) {
+        throw new Error(`Invalid coordinates: latitude=${lat}, longitude=${lng}`);
+      }
+      
+      logger.info(` DeliveryRequest.updateLocationByUid: uid=${uid}, lat=${lat}, lng=${lng}`);
+      
       const [res] = await connection.execute(
         'UPDATE delivery_requests SET latitude = ?, longitude = ?, updated_at = NOW() WHERE uid = ?',
-        [latitude, longitude, uid]
+        [lat, lng, uid]
       );
       connection.release();
       return res;

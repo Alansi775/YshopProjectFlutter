@@ -4,7 +4,7 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import StoreController from '../controllers/StoreController.js';
 import { validateStore, handleValidationErrors } from '../middleware/validation.js';
-import { verifyFirebaseToken, verifyAdminRole } from '../middleware/auth.js';
+import { verifyFirebaseToken, verifyAdminToken, verifyAdminRole } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -40,14 +40,14 @@ const upload = multer({
 
 // Admin routes for Dashboard - must come before generic routes
 //  NEW: Single endpoint for all dashboard store data (solves the 6-request problem!)
-router.get('/admin/dashboard-stats', verifyFirebaseToken, verifyAdminRole, StoreController.getDashboardStats);
+router.get('/admin/dashboard-stats', verifyAdminToken, verifyAdminRole, StoreController.getDashboardStats);
 
-router.get('/admin/pending', verifyFirebaseToken, verifyAdminRole, StoreController.getPendingStores);
-router.get('/admin/approved', verifyFirebaseToken, verifyAdminRole, StoreController.getApprovedStores);
-router.put('/admin/:id/approve', verifyFirebaseToken, verifyAdminRole, StoreController.approveStore);
-router.put('/admin/:id/reject', verifyFirebaseToken, verifyAdminRole, StoreController.rejectStore);
-router.put('/admin/:id/suspend', verifyFirebaseToken, verifyAdminRole, StoreController.suspendStore);
-router.delete('/admin/:id/delete', verifyFirebaseToken, verifyAdminRole, StoreController.deleteStoreWithProducts);
+router.get('/admin/pending', verifyAdminToken, verifyAdminRole, StoreController.getPendingStores);
+router.get('/admin/approved', verifyAdminToken, verifyAdminRole, StoreController.getApprovedStores);
+router.put('/admin/:id/approve', verifyAdminToken, verifyAdminRole, StoreController.approveStore);
+router.put('/admin/:id/reject', verifyAdminToken, verifyAdminRole, StoreController.rejectStore);
+router.put('/admin/:id/suspend', verifyAdminToken, verifyAdminRole, StoreController.suspendStore);
+router.delete('/admin/:id/delete', verifyAdminToken, verifyAdminRole, StoreController.deleteStoreWithProducts);
 
 // Generic Routes
 router.get('/', StoreController.getAll);

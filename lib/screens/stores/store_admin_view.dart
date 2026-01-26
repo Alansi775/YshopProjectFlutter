@@ -1,8 +1,7 @@
 // lib/screens/stores/store_admin_view.dart
 
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
 import 'dart:async';
 // استيراد جميع الشاشات الجديدة
 import '../auth/sign_in_view.dart';
@@ -20,8 +19,8 @@ import 'category_selector_sheet.dart';
 import '../../widgets/store_admin_widgets.dart'; 
 import '../../models/store.dart';
 import '../../models/category.dart';
-
 import '../../services/api_service.dart';
+import '../../state_management/auth_manager.dart';
 
 class StoreAdminView extends StatefulWidget {
   final String initialStoreName;
@@ -177,46 +176,77 @@ class _StoreAdminViewState extends State<StoreAdminView> {
     
     setState(() => _isLoading = true);
     try {
-      final storeData = await ApiService.getUserStore();
-      if (storeData != null) {
-        final store = Store.fromJson(storeData);
-        final ownerUid = storeData['owner_uid']?.toString() ?? '';
-        final storeId = storeData['id'] as int? ?? 0;
-        final storeType = storeData['store_type'] as String? ?? '';
+      // First, try to get UID from AuthManager (already logged in)
+      final authManager = Provider.of<AuthManager>(context, listen: false);
+      final uidFromAuth = authManager.userProfile?['uid'] as String? ?? '';
+      final userProfile = authManager.userProfile;
+      
+      debugPrint(' Loading store for UID: $uidFromAuth');
+      
+      // Try to fetch store data from API
+      dynamic storeData;
+      try {
+        storeData = await ApiService.getUserStore(uid: uidFromAuth);
+      } catch (e) {
+        debugPrint('⚠️ API getUserStore failed: $e');
+        storeData = null;
+      }
+      
+      if (storeData != null && storeData is Map && storeData.isNotEmpty) {
+        // Store data from API - cast to Map<String, dynamic>
+        final storeDataMap = Map<String, dynamic>.from(storeData);
+        final store = Store.fromJson(storeDataMap);
+        final ownerUid = (store.uid ?? storeDataMap['uid']?.toString() ?? storeDataMap['owner_uid']?.toString() ?? uidFromAuth).trim();
+        final storeId = storeDataMap['id'] as int? ?? 0;
+        final storeType = storeDataMap['store_type'] as String? ?? '';
         
-        //  Update state with FRESH data from API
         setState(() {
-          _storeName = store.storeName;
+          _storeName = store.storeName.isNotEmpty ? store.storeName : widget.initialStoreName;
           _storeIconUrl = store.storeIconUrl;
           _storeOwnerUid = ownerUid;
           _storeId = storeId;
           _storeType = storeType;
         });
         
-        debugPrint(' Store loaded: ${store.storeName} | UID: $ownerUid | Type: $storeType');
+        debugPrint(' ✅ Store loaded from API: ${store.storeName} | UID: $ownerUid');
         
-        // Fetch products with the fresh UID
-        await _fetchProducts(ownerUid);
-        
-        // Fetch categories for all store types (not just market)
-        await _fetchCategories(storeId);
+        // Fetch products and categories
+        if (ownerUid.isNotEmpty) {
+          await _fetchProducts(ownerUid);
+        }
+        if (storeId > 0) {
+          await _fetchCategories(storeId);
+        }
       } else {
-        // ❌ If API fails, show error - don't use old initialStoreName
+        // Fallback: Use data from AuthManager (userProfile)
+        debugPrint('⚠️ No store data from API, using AuthManager fallback');
+        
+        final storeName = userProfile?['name'] as String? ?? widget.initialStoreName;
+        final storeIcon = userProfile?['store_icon'] as String? ?? '';
+        
         setState(() {
-          _storeName = "Error Loading Store";
-          _storeIconUrl = "";
-          _storeOwnerUid = "";
-          _storeType = "";
+          _storeName = storeName.isNotEmpty ? storeName : widget.initialStoreName;
+          _storeIconUrl = storeIcon;
+          _storeOwnerUid = uidFromAuth;
+          _storeType = userProfile?['store_type'] as String? ?? '';
           _storeId = 0;
           _products = [];
           _categories = [];
         });
-        debugPrint('❌ Failed to load store data from API');
+        
+        debugPrint(' Using fallback store name: $_storeName | UID: $uidFromAuth');
+        
+        // Try to fetch products anyway
+        if (uidFromAuth.isNotEmpty) {
+          await _fetchProducts(uidFromAuth);
+        }
       }
-    } catch (e) {
-      debugPrint("❌ Error fetching store: $e");
+    } catch (e, stackTrace) {
+      debugPrint("❌ Critical error in _fetchStoreNameAndProducts: $e\n$stackTrace");
+      
+      // Ultimate fallback - use initial store name
       setState(() {
-        _storeName = "Error Loading Store";
+        _storeName = widget.initialStoreName;
         _storeIconUrl = "";
         _storeOwnerUid = "";
         _storeType = "";
@@ -462,7 +492,10 @@ class _StoreAdminViewState extends State<StoreAdminView> {
     //  Clear admin role when logging out
     ApiService.setAdminRole(null);
     ApiService.setAdminProfile(null);
-    await FirebaseAuth.instance.signOut();
+    
+    final authManager = Provider.of<AuthManager>(context, listen: false);
+    await authManager.signOut();
+    
     if (mounted) {
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (context) => const SignInView()),
@@ -484,7 +517,8 @@ class _StoreAdminViewState extends State<StoreAdminView> {
 
   //  التصحيح: جلب البريد الإلكتروني وتمريره إلى OrdersView 
   void _onOrders() {
-    final storeEmail = FirebaseAuth.instance.currentUser?.email;
+    final authManager = Provider.of<AuthManager>(context, listen: false);
+    final storeEmail = authManager.userProfile?['email'] as String?;
 
     if (storeEmail != null) {
       Navigator.of(context).push(MaterialPageRoute(
@@ -499,7 +533,9 @@ class _StoreAdminViewState extends State<StoreAdminView> {
   }
 
   void _onMessages() {
-    final email = FirebaseAuth.instance.currentUser?.email;
+    final authManager = Provider.of<AuthManager>(context, listen: false);
+    final email = authManager.userProfile?['email'] as String?;
+    
     if (email != null) {
       Navigator.of(context).push(MaterialPageRoute(
         builder: (context) => ChatListView(storeOwnerID: email),
@@ -589,7 +625,11 @@ class _StoreAdminViewState extends State<StoreAdminView> {
                   padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
                   child: Column(
                     children: [
-                      HeaderSection(storeName: _storeName, storeIconUrl: _storeIconUrl, storeOwnerUid: FirebaseAuth.instance.currentUser?.uid ?? ''),
+                      HeaderSection(
+                        storeName: _storeName,
+                        storeIconUrl: _storeIconUrl,
+                        storeOwnerUid: Provider.of<AuthManager>(context, listen: false).userProfile?['uid'] as String? ?? '',
+                      ),
                       
                       QuickActionGrid(
                         //  ربط الإجراءات بأحدث الدوال

@@ -89,12 +89,15 @@ class _AdminHomeViewState extends State<AdminHomeView> {
     if (!mounted) return;
     
     try {
+      debugPrint(' [Dashboard] Loading dashboard data...');
+      
       //  Always clear cache BEFORE loading to ensure fresh data
       ApiService.clearCache();
       setState(() => _isLoading = true);
       
       //  NEW: Use single endpoint instead of 6 separate requests!
       final dashboardStats = await ApiService.getDashboardStats();
+      debugPrint(' [Dashboard] Received dashboard stats');
       
       final orders = dashboardStats['orders'] as List? ?? [];
       double totalRevenue = 0.0;
@@ -106,12 +109,17 @@ class _AdminHomeViewState extends State<AdminHomeView> {
         appRevenue += RevenueCalculator.calculateAppRevenue(price);
       }
       
+      final approvedStoresCount = (dashboardStats['approved_stores'] as List?)?.length ?? 0;
+      final pendingStoresCount = (dashboardStats['pending_stores'] as List?)?.length ?? 0;
+      
+      debugPrint(' [Dashboard] Stats: Approved=${approvedStoresCount}, Pending=${pendingStoresCount}');
+      
       if (!mounted) return;
       
       setState(() {
         _dashboardData = {
-          'approvedStores': (dashboardStats['approved_stores'] as List?)?.length ?? 0,
-          'pendingStores': (dashboardStats['pending_stores'] as List?)?.length ?? 0,
+          'approvedStores': approvedStoresCount,
+          'pendingStores': pendingStoresCount,
           'pendingProducts': dashboardStats['pending_products_count'] ?? 0,
           'activeDrivers': dashboardStats['active_deliveries_count'] ?? 0,
           'pendingDrivers': dashboardStats['pending_deliveries_count'] ?? 0,
@@ -121,8 +129,10 @@ class _AdminHomeViewState extends State<AdminHomeView> {
         };
         _isLoading = false;
       });
+      
+      debugPrint(' [Dashboard] Updated UI with new data');
     } catch (e) {
-      debugPrint('Error loading dashboard data: $e');
+      debugPrint('❌ [Dashboard] Error loading dashboard data: $e');
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -735,7 +745,7 @@ class _AdminHomeViewState extends State<AdminHomeView> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 🎯 QUICK ACTION CARD
+//  QUICK ACTION CARD
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _QuickActionCard extends StatelessWidget {

@@ -1,5 +1,4 @@
 // lib/models/store.dart
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/api_service.dart';
 
 class Store {
@@ -12,6 +11,7 @@ class Store {
   final String? status;
   final String? email;
   final String? ownerUid;
+  final String? uid;  // UID من جدول stores
 
   // use ApiService.baseUrl for platform-aware host
 
@@ -25,25 +25,10 @@ class Store {
     this.status,
     this.email,
     this.ownerUid,
+    this.uid,
   });
 
-  // Factory for Firestore (legacy)
-  factory Store.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    return Store(
-      id: doc.id,
-      storeName: data['storeName'] ?? 'Unknown Store',
-      storeType: data['storeType'] ?? '',
-      storeIconUrl: data['storeIconUrl'] ?? '',
-      address: data['address'],
-      storePhoneNumber: data['storePhoneNumber'] ?? data['phone'],
-      status: data['status'],
-      email: data['email'] ?? data['ownerEmail'],
-      ownerUid: data['ownerUid'],
-    );
-  }
-
-  //  Factory for backend API (MySQL)
+  // Factory for backend API (MySQL)
   factory Store.fromJson(Map<String, dynamic> json) {
     // تحويل المسار النسبي إلى URL كامل
     String iconUrl = json['icon_url'] as String? ?? '';
@@ -64,6 +49,7 @@ class Store {
       status: status,
       email: json['email'],
       ownerUid: json['owner_uid'] ?? json['ownerUid'],
+      uid: json['uid'] ?? json['owner_uid'],  // استخدم uid من الـ response
     );
   }
 

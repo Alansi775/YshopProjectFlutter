@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_auth/firebase_auth.dart'; 
-
-import 'firebase_options.dart'; 
-import 'screens/auth/sign_in_view.dart'; 
-import 'screens/admin/admin_home_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'screens/auth/sign_in_view.dart';
+import 'screens/admin/admin_home_view.dart';
+import 'screens/customers/category_home_view.dart';
+import 'screens/delivery/delivery_home_view.dart';
+import 'screens/stores/store_admin_view.dart';
 import 'widgets/order_tracker_widget.dart';
 import 'services/navigation_service.dart';
 
-import 'state_management/cart_manager.dart'; 
-import 'state_management/auth_manager.dart'; 
+import 'state_management/cart_manager.dart';
+import 'state_management/auth_manager.dart';
 import 'state_management/theme_manager.dart'; 
 
 // =======================================================
@@ -80,16 +80,19 @@ final _darkThemeData = ThemeData(
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  
+  //  CRITICAL: Initialize SharedPreferences before anything else
+  await SharedPreferences.getInstance();
+
+  // Create AuthManager and load cached token BEFORE running app
+  final authManager = AuthManager();
+  await authManager.initializeAsync();
+
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AuthManager()),
+        ChangeNotifierProvider.value(value: authManager),
         ChangeNotifierProvider(create: (_) => CartManager()),
-        ChangeNotifierProvider(create: (_) => ThemeManager()), 
+        ChangeNotifierProvider(create: (_) => ThemeManager()),
       ],
       child: const MyApp(),
     ),
@@ -106,11 +109,12 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    //  استخدام Consumer للاستماع للتغييرات تلقائياً
+    //  استخدام Consumer للاستماع للتغييرات تلقائياً فقط للـ themeMode
     return Consumer<ThemeManager>(
       builder: (context, themeManager, child) {
         debugPrint('🎨 Theme updated: ${themeManager.themeMode}');
         
+        // Build MaterialApp without listening to theme changes in home
         return MaterialApp(
           navigatorKey: NavigationService.navigatorKey,
           title: 'YSHOP',
@@ -132,40 +136,47 @@ class MyApp extends StatelessWidget {
             );
           },
 
-          home: FutureBuilder<SharedPreferences?>(
-            future: SharedPreferences.getInstance().then((p) => p),
-            builder: (context, prefSnap) {
-              if (prefSnap.connectionState == ConnectionState.waiting) {
-                return const Scaffold(
-                  body: Center(child: CircularProgressIndicator()),
-                );
-              }
-              final prefs = prefSnap.data;
-              try {
-                final token = prefs?.getString('admin_token');
-                final expiryMs = prefs?.getInt('admin_token_expiry');
-                if (token != null && expiryMs != null) {
-                  final expiry = DateTime.fromMillisecondsSinceEpoch(expiryMs);
-                  if (DateTime.now().isBefore(expiry)) {
-                    return const AdminHomeView();
-                  }
-                }
-              } catch (_) {}
-
-              return StreamBuilder<User?>(
-                stream: FirebaseAuth.instance.authStateChanges(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Scaffold(
-                      body: Center(child: CircularProgressIndicator()),
-                    );
-                  }
-                  return const SignInView();
-                },
-              );
-            },
-          ),
+          home: child ?? const _HomeScreen(),
         );
+      },
+      child: const _HomeScreen(),
+    );
+  }
+}
+ 
+
+class _HomeScreen extends StatelessWidget {
+  const _HomeScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<AuthManager>(
+      builder: (context, authManager, child) {
+        // Use isAuthenticated which is set synchronously if token exists in SharedPreferences
+        // authManager.initializeAsync() was called before main(), so token/profile should be loaded
+        
+        if (authManager.isAuthenticated) {
+          final userType = authManager.userProfile?['userType'] as String?;
+          final storeName = authManager.userProfile?['name'] as String? ?? 'Store';
+          final driverName = authManager.userProfile?['display_name'] as String? ?? 'Driver';
+
+          // التحقق من نوع المستخدم وإعادة التوجيه للصفحة المناسبة
+          if (userType == 'storeOwner') {
+            debugPrint(' Store Owner persisted - showing StoreAdminView');
+            return StoreAdminView(initialStoreName: storeName);
+          } else if (userType == 'deliveryDriver') {
+            debugPrint('🚗 Delivery Driver persisted - showing DeliveryHomeView');
+            return DeliveryHomeView(driverName: driverName);
+          } else if (userType == 'admin' || userType == 'superadmin') {
+            debugPrint('👨‍💼 Admin persisted - showing AdminHomeView');
+            return const AdminHomeView();
+          } else {
+            debugPrint(' Customer persisted - showing CategoryHomeView');
+            return const CategoryHomeView();
+          }
+        } else {
+          return const SignInView();
+        }
       },
     );
   }

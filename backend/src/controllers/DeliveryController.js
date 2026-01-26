@@ -9,7 +9,7 @@ import logger from '../config/logger.js';
 import admin from '../config/firebase.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ⚙️ CONFIGURATION
+//  CONFIGURATION
 // ─────────────────────────────────────────────────────────────────────────────
 
 const CONFIG = {
@@ -49,16 +49,20 @@ class DeliveryController {
 
   static async me(req, res, next) {
     try {
-      const uid = req.user?.uid;
+      const uid = req.user?.id || req.user?.uid;  // JWT has 'id', fallback to 'uid'
       if (!uid) {
+        console.log('[DeliveryController.me] No uid found in req.user:', req.user);
         return res.status(401).json({ success: false, message: 'Unauthorized' });
       }
 
+      console.log('[DeliveryController.me] Looking up driver with uid:', uid);
       const row = await DeliveryRequest.findByUid(uid);
       if (!row) {
+        console.log('[DeliveryController.me] No driver found for uid:', uid);
         return res.status(404).json({ success: false, message: 'Not found' });
       }
 
+      console.log('[DeliveryController.me] Found driver:', row.email);
       res.json({ success: true, data: row });
     } catch (error) {
       logger.error('Error fetching delivery request for user', error);
@@ -69,7 +73,10 @@ class DeliveryController {
   static async updateLocation(req, res, next) {
     try {
       const { latitude, longitude } = req.body;
-      const uid = req.user?.uid;
+      const uid = req.user?.id || req.user?.uid;
+
+      // DEBUG LOG
+      logger.info(`📍 updateLocation called: uid=${uid}, latitude=${latitude}, longitude=${longitude}, body=${JSON.stringify(req.body)}`);
 
       if (!uid) {
         return res.status(401).json({ success: false, message: 'Unauthorized' });
@@ -79,7 +86,12 @@ class DeliveryController {
         return res.status(400).json({ success: false, message: 'latitude and longitude required' });
       }
 
-      await DeliveryRequest.updateLocationByUid(uid, parseFloat(latitude), parseFloat(longitude));
+      const lat = parseFloat(latitude);
+      const lng = parseFloat(longitude);
+      
+      logger.info(`📍 Parsed coordinates: lat=${lat}, lng=${lng}, isNaN(lat)=${isNaN(lat)}, isNaN(lng)=${isNaN(lng)}`);
+
+      await DeliveryRequest.updateLocationByUid(uid, lat, lng);
       res.json({ success: true });
     } catch (error) {
       logger.error('Error updating delivery request location', error);
@@ -114,7 +126,7 @@ class DeliveryController {
    */
   static async getOrderOffer(req, res, next) {
     try {
-      const uid = req.user?.uid;
+      const uid = req.user?.id || req.user?.uid;
       const { latitude, longitude } = req.query;
 
       if (!uid) {
@@ -147,6 +159,12 @@ class DeliveryController {
       if (!pendingOrders || pendingOrders.length === 0) {
         return res.json({ success: true, data: null });
       }
+
+      // DEBUG: Log all pending orders
+      logger.info(`📋 Found ${pendingOrders.length} pending orders`);
+      pendingOrders.forEach((order, idx) => {
+        logger.info(`  Order ${idx + 1}: ID=${order.id}, currency="${order.currency}", total=${order.total_price}`);
+      });
 
       // Process each order
       for (const order of pendingOrders) {
@@ -252,7 +270,7 @@ class DeliveryController {
    */
   static async acceptOffer(req, res, next) {
     try {
-      const uid = req.user?.uid;
+      const uid = req.user?.id || req.user?.uid;
       const { orderId } = req.body;
 
       if (!uid) {
@@ -323,7 +341,7 @@ class DeliveryController {
    */
   static async skipOffer(req, res, next) {
     try {
-      const uid = req.user?.uid;
+      const uid = req.user?.id || req.user?.uid;
       const { orderId } = req.body;
 
       if (!uid) {
@@ -351,7 +369,7 @@ class DeliveryController {
    */
   static async getSkippedOrders(req, res, next) {
     try {
-      const uid = req.user?.uid;
+      const uid = req.user?.id || req.user?.uid;
       const { latitude, longitude } = req.query;
 
       if (!uid) {
@@ -426,7 +444,7 @@ class DeliveryController {
    */
   static async reclaimOrder(req, res, next) {
     try {
-      const uid = req.user?.uid;
+      const uid = req.user?.id || req.user?.uid;
       const { orderId } = req.body;
 
       if (!uid) {
@@ -491,7 +509,7 @@ class DeliveryController {
    */
   static async getActiveOrder(req, res, next) {
     try {
-      const uid = req.user?.uid;
+      const uid = req.user?.id || req.user?.uid;
       if (!uid) {
         return res.status(401).json({ success: false, message: 'Unauthorized' });
       }
@@ -511,7 +529,7 @@ class DeliveryController {
 
   static async pickupOrder(req, res, next) {
     try {
-      const uid = req.user?.uid;
+      const uid = req.user?.id || req.user?.uid;
       const { orderId } = req.params;
 
       if (!uid) {
@@ -543,7 +561,7 @@ class DeliveryController {
 
   static async updateOrderLocation(req, res, next) {
     try {
-      const uid = req.user?.uid;
+      const uid = req.user?.id || req.user?.uid;
       const { orderId } = req.params;
       const { latitude, longitude } = req.body;
 
@@ -571,7 +589,7 @@ class DeliveryController {
 
   static async markDelivered(req, res, next) {
     try {
-      const uid = req.user?.uid;
+      const uid = req.user?.id || req.user?.uid;
       const { orderId } = req.params;
 
       if (!uid) {
@@ -607,12 +625,12 @@ class DeliveryController {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // 📊 HISTORY & STATS
+  //  HISTORY & STATS
   // ═══════════════════════════════════════════════════════════════════════════
 
   static async getDeliveryHistory(req, res, next) {
     try {
-      const uid = req.user?.uid;
+      const uid = req.user?.id || req.user?.uid;
       const { month, year, page = 1, limit = 50 } = req.query;
 
       if (!uid) {
@@ -636,7 +654,7 @@ class DeliveryController {
 
   static async getDriverStats(req, res, next) {
     try {
-      const uid = req.user?.uid;
+      const uid = req.user?.id || req.user?.uid;
       const { month, year } = req.query;
 
       if (!uid) {
@@ -698,7 +716,33 @@ class DeliveryController {
         return res.status(404).json({ success: false, message: 'Not found' });
       }
 
+      // Update status in delivery_requests to 'Approved'
       await DeliveryRequest.updateStatus(id, 'Approved');
+
+      // Create user account in users table (so driver can login normally)
+      try {
+        const pool = require('../config/database.js').default;
+        const connection = await pool.getConnection();
+        
+        // Check if user already exists
+        const [existingUser] = await connection.execute(
+          'SELECT id FROM users WHERE uid = ?',
+          [row.uid]
+        );
+        
+        if (existingUser.length === 0) {
+          // Insert into users table
+          await connection.execute(
+            `INSERT INTO users (uid, email, password_hash, display_name, phone, national_id, address, email_verified, latitude, longitude) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+            [row.uid, row.email, row.password_hash, row.name, row.phone, row.national_id, row.address, row.latitude, row.longitude]
+          );
+        }
+        
+        connection.release();
+      } catch (userError) {
+        logger.warn('Could not create user account for driver', userError.message);
+      }
 
       try {
         await admin.auth().setCustomUserClaims(row.uid, { deliveryApproved: true });
@@ -797,7 +841,7 @@ class DeliveryController {
       const lng = parseFloat(longitude);
 
       try {
-        const uid = req.user?.uid;
+        const uid = req.user?.id || req.user?.uid;
         if (uid) {
           await DeliveryRequest.updateLocationByUid(uid, lat, lng);
         }
@@ -857,6 +901,7 @@ async function createOfferForDriver(order, driverUid, driverLat, driverLng) {
     store_id: order.store_id,
     store_name: order.store_name || 'Store',
     total_price: parseFloat(order.total_price) || 0,
+    currency: order.currency || 'USD',
     distance_to_store: distanceToStore,
     estimated_earnings: (parseFloat(order.total_price) || 0) * CONFIG.DRIVER_COMMISSION_RATE,
     expires_at: expiresAt.toISOString(),
@@ -882,11 +927,17 @@ function buildOfferResponse(order, driverLat, driverLng) {
   const expiresAt = new Date(order.offer_expires_at);
   const remainingSeconds = Math.max(0, Math.floor((expiresAt - new Date()) / 1000));
 
-  return {
+  // DEBUG: Log the order object to see what we're getting
+  logger.info(`🔍 Order object keys: ${Object.keys(order).join(', ')}`);
+  logger.info(`🔍 Order.currency value: "${order.currency}" (type: ${typeof order.currency})`);
+  logger.info(`🔍 Full order object: ${JSON.stringify(order)}`);
+
+  const offerResponse = {
     order_id: order.id,
     store_id: order.store_id,
     store_name: order.store_name || 'Store',
     total_price: parseFloat(order.total_price) || 0,
+    currency: order.currency || 'USD',
     distance_to_store: distanceToStore,
     estimated_earnings: (parseFloat(order.total_price) || 0) * CONFIG.DRIVER_COMMISSION_RATE,
     expires_at: expiresAt.toISOString(),
@@ -897,6 +948,9 @@ function buildOfferResponse(order, driverLat, driverLng) {
     customer_longitude: customerLng,
     customer_address: order.shipping_address || order.customer_address || '',
   };
+
+  logger.info(`📦 Offer Response: Order #${offerResponse.order_id}, Price: ${offerResponse.total_price}, Currency: ${offerResponse.currency}`);
+  return offerResponse;
 }
 
 export default DeliveryController;

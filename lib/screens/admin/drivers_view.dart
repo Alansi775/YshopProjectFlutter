@@ -45,13 +45,21 @@ class _DriversManagementViewState extends State<DriversManagementView> with Sing
   }
 
   Future<void> _loadDrivers() async {
+    debugPrint('📥 [_loadDrivers] Starting to load drivers from backend...');
     setState(() => _isLoading = true);
     try {
-      //  Clear cache first to ensure fresh data
+      //  Completely clear all cache and pending requests
       ApiService.clearCache();
+      ApiService.clearPendingRequests();
       
+      // Wait to ensure clearing is complete
+      await Future.delayed(const Duration(milliseconds: 100));
+      
+      // Load SEQUENTIALLY to avoid race conditions with skipDedup
       final active = await ApiService.getActiveDeliveryRequests();
+      await Future.delayed(const Duration(milliseconds: 50));
       final approved = await ApiService.getApprovedDeliveryRequests();
+      await Future.delayed(const Duration(milliseconds: 50));
       final pending = await ApiService.getPendingDeliveryRequests();
 
       if (mounted) {
@@ -61,10 +69,12 @@ class _DriversManagementViewState extends State<DriversManagementView> with Sing
           _approvedDrivers = (approved as List?)?.map((d) => DeliveryRequest.fromMap(d)).toList() ?? [];
           _pendingDrivers = (pending as List?)?.map((d) => DeliveryRequest.fromMap(d)).toList() ?? [];
           _isLoading = false;
+          
+          debugPrint('📥 [_loadDrivers] Loaded ${_activeDrivers.length} active + ${_approvedDrivers.length} approved + ${_pendingDrivers.length} pending');
         });
       }
     } catch (e) {
-      debugPrint('Error loading drivers: $e');
+      debugPrint('❌ [_loadDrivers] Error: $e');
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -93,11 +103,8 @@ class _DriversManagementViewState extends State<DriversManagementView> with Sing
         });
         // Clear cache for next load
         ApiService.clearCache();
-        ApiService.clearPendingRequests();
         //  Wait for backend to update before next action (same as stores)
         await Future.delayed(const Duration(milliseconds: 1000));
-        //  Reload drivers immediately in this view to avoid cache issues
-        await _loadDrivers();
         //  Notify parent (Dashboard) to refresh counts
         widget.onDriverUpdated?.call();
       }
@@ -112,20 +119,20 @@ class _DriversManagementViewState extends State<DriversManagementView> with Sing
 
   Future<void> _rejectDriver(DeliveryRequest driver) async {
     try {
-      await ApiService.setDeliveryRequestPending(driver.id);
+      await ApiService.rejectDeliveryRequest(driver.id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${driver.name} set to pending'),
+            content: Text('${driver.name} rejected'),
             backgroundColor: kAccentOrange,
           ),
         );
-        //  FIX: Create NEW DeliveryRequest with updated status = 'Pending'
+        //  FIX: Create NEW DeliveryRequest with updated status = 'Rejected'
         setState(() {
           _approvedDrivers.removeWhere((d) => d.id == driver.id);
           _activeDrivers.removeWhere((d) => d.id == driver.id);
           //  Create a new object with the correct status
-          final pendingDriver = DeliveryRequest(
+          final rejectedDriver = DeliveryRequest(
             id: driver.id,
             uid: driver.uid,
             name: driver.name,
@@ -133,18 +140,16 @@ class _DriversManagementViewState extends State<DriversManagementView> with Sing
             phoneNumber: driver.phoneNumber,
             nationalID: driver.nationalID,
             address: driver.address,
-            status: 'Pending', //  Explicitly set to 'Pending'
-            isWorking: false, // When suspended, driver is not working
+            status: 'Rejected', //  Explicitly set to 'Rejected'
+            isWorking: false, // When rejected, driver is not working
             createdAt: driver.createdAt,
           );
-          _pendingDrivers.insert(0, pendingDriver);
         });
         // Clear cache for next load
         ApiService.clearCache();
-        ApiService.clearPendingRequests();
         //  Wait for backend to update before next action (same as stores)
         await Future.delayed(const Duration(milliseconds: 1000));
-        //  Reload drivers immediately in this view to avoid cache issues
+        //  Reload drivers from backend to sync state
         await _loadDrivers();
         //  Notify parent (Dashboard) to refresh counts
         widget.onDriverUpdated?.call();

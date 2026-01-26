@@ -13,8 +13,8 @@ class WelcomingPageShimmer extends StatelessWidget {
     final Color primaryTextColor = Theme.of(context).colorScheme.primary; 
     
     //  2. الحصول على لون التمييز الثانوي من الثيم (بدلاً من accentBlue الثابت)
-    // هذا اللون يفضل أن يكون ثابتًا في الثيم (مثل الأزرق)
-    final Color accentColor = Theme.of(context).colorScheme.secondary; 
+    // هذا اللون يفضل أن يكون ثابتًا في الثيم (نفس الأزرق الخفيف)
+    final Color accentColor = const Color(0xFF42A5F5); // الأزرق الخفيف 
     
     //  3. لون رمادي يتغير مع الثيم: أفتح في الداكن وأغمق في الفاتح
     final Color shimmerBaseColor = Theme.of(context).brightness == Brightness.dark 

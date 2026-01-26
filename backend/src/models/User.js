@@ -48,7 +48,22 @@ export class User {
       connection.release();
       return rows[0];
     } catch (error) {
-      logger.error('Error finding user:', error);
+      logger.error('Error finding user by uid:', error);
+      throw error;
+    }
+  }
+
+  static async findById(id) {
+    try {
+      const connection = await pool.getConnection();
+      const [rows] = await connection.execute(
+        'SELECT * FROM users WHERE id = ?',
+        [id]
+      );
+      connection.release();
+      return rows[0];
+    } catch (error) {
+      logger.error('Error finding user by id:', error);
       throw error;
     }
   }
@@ -68,30 +83,67 @@ export class User {
     }
   }
 
-  static async update(uid, userData) {
+  static async update(userId, userData) {
     try {
       const updates = [];
       const values = [];
 
+      // 🔥 CRITICAL: Strictly validate ALL values before adding to query
+      // Skip undefined, null, empty strings, and NaN values
       Object.entries(userData).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && key !== 'uid') {
-          updates.push(`${this.camelToSnake(key)} = ?`);
-          values.push(value);
+        // Skip if: undefined, null, empty string, NaN, or key is 'id' or 'uid'
+        if (
+          key === 'id' || 
+          key === 'uid' ||
+          value === undefined || 
+          value === null || 
+          value === '' ||
+          (typeof value === 'number' && isNaN(value))
+        ) {
+          logger.debug(`Skipping field ${key} with value:`, value);
+          return; // Skip this field
         }
+        
+        // Add to query only valid values
+        const snakeKey = this.camelToSnake(key);
+        updates.push(`${snakeKey} = ?`);
+        
+        // Ensure value is safe for SQL binding
+        // Convert to string if it's not a number to prevent type issues
+        let safeValue = value;
+        if (typeof value === 'string') {
+          safeValue = value.trim();
+        } else if (typeof value === 'number') {
+          safeValue = parseFloat(value);
+        }
+        
+        values.push(safeValue);
+        logger.debug(`Adding field ${key} (${snakeKey}) with value:`, { value, safeValue });
       });
 
-      if (updates.length === 0) return null;
+      // If no valid fields to update, return existing data
+      if (updates.length === 0) {
+        logger.info('No valid fields to update, returning existing user');
+        const user = await this.findById(userId);
+        return user;
+      }
 
-      values.push(uid);
+      values.push(userId);
+
+      logger.info('Executing UPDATE query:', {
+        query: `UPDATE users SET ${updates.join(', ')} WHERE id = ?`,
+        valueCount: values.length,
+        values: values.map(v => typeof v === 'string' ? v.substring(0, 50) : v)
+      });
 
       const connection = await pool.getConnection();
       await connection.execute(
-        `UPDATE users SET ${updates.join(', ')} WHERE uid = ?`,
+        `UPDATE users SET ${updates.join(', ')} WHERE id = ?`,
         values
       );
       connection.release();
 
-      return { uid, ...userData };
+      return { id: userId, ...userData };
     } catch (error) {
       logger.error('Error updating user:', error);
       throw error;

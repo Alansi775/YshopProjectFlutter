@@ -5,18 +5,20 @@ import logger from '../config/logger.js';
  * Product Model
  */
 export class Product {
-  static async findAll(filters = {}, page = 1, limit = 20) {
+  static async findAll(filters = {}, page = 1, limit = 100) {
     try {
       const offset = (page - 1) * limit;
-      let query = `SELECT 
+      let query = `SELECT SQL_NO_CACHE
         p.*, 
         s.name as store_name, 
         s.phone as store_phone, 
-        u.email as owner_email,
-        u.uid as owner_uid
+        COALESCE(u.email, s.email) as owner_email,
+        s.uid as owner_uid,
+        c.name as category_name
       FROM products p 
       LEFT JOIN stores s ON p.store_id = s.id 
       LEFT JOIN users u ON s.owner_uid = u.uid 
+      LEFT JOIN categories c ON p.category_id = c.id 
       WHERE 1=1`;
       const values = [];
 
@@ -35,7 +37,7 @@ export class Product {
       }
 
       if (filters.storeOwnerUid) {
-        query += ' AND s.owner_uid = ?';
+        query += ' AND s.uid = ?';
         values.push(String(filters.storeOwnerUid));
       }
 
@@ -108,8 +110,8 @@ export class Product {
           p.*, 
           s.name as store_name, 
           s.phone as store_phone, 
-          u.email as owner_email,
-          u.uid as owner_uid
+          COALESCE(u.email, s.email) as owner_email,
+          s.uid as owner_uid
         FROM products p 
         LEFT JOIN stores s ON p.store_id = s.id 
         LEFT JOIN users u ON s.owner_uid = u.uid 
@@ -209,12 +211,12 @@ export class Product {
 
   // ==================== ADMIN METHODS ====================
 
-  static async findByStatus(status, page = 1, limit = 20) {
+  static async findByStatus(status, page = 1, limit = 100) {
     try {
       const offset = (page - 1) * limit;
       const connection = await pool.getConnection();
 
-      // Join with stores table to get store email and phone
+      // Join with stores table and categories to get store email, phone, and category info
       const query = `
         SELECT 
           p.id,
@@ -226,12 +228,15 @@ export class Product {
           p.status,
           p.created_at,
           p.store_id,
+          p.category_id,
           s.name as store_name,
           s.phone as store_phone,
-          u.email as owner_email
+          u.email as owner_email,
+          c.name as category_name
         FROM products p
         LEFT JOIN stores s ON p.store_id = s.id
         LEFT JOIN users u ON s.owner_uid = u.uid
+        LEFT JOIN categories c ON p.category_id = c.id
         WHERE p.status = ?
         ORDER BY p.created_at DESC
         LIMIT ${parseInt(limit)} OFFSET ${parseInt(offset)}

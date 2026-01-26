@@ -84,7 +84,7 @@ export function startFirestoreSync() {
 
         // Only set/overwrite icon_url when Firestore provides a non-empty value.
         // This prevents an empty/missing field in Firestore from clearing a previously uploaded image path in MySQL.
-        console.log(`📊 Firestore sync: About to execute SQL for store ${storeId}, setting status to '${dbStatus}'`);
+        console.log(` Firestore sync: About to execute SQL for store ${storeId}, setting status to '${dbStatus}'`);
         await pool.query(
           `INSERT INTO stores (owner_uid, name, store_type, phone, address, status, icon_url, description, email)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)

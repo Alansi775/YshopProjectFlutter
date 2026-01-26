@@ -84,8 +84,8 @@ export class Store {
           s.*,
           COALESCE(NULLIF(u.email, ''), s.email) as email
         FROM stores s
-        LEFT JOIN users u ON s.owner_uid = u.uid
-        WHERE s.owner_uid = ?
+        LEFT JOIN users u ON s.uid = u.uid
+        WHERE s.uid = ?
         LIMIT 1`,
         [ownerUid]
       );
@@ -234,7 +234,7 @@ export class Store {
     try {
       const connection = await pool.getConnection();
       const [rows] = await connection.execute(
-        `SELECT 
+        `SELECT SQL_NO_CACHE
           s.*,
           COALESCE(NULLIF(u.email, ''), s.email) as email
         FROM stores s
@@ -255,7 +255,7 @@ export class Store {
     try {
       const connection = await pool.getConnection();
       const [rows] = await connection.execute(
-        `SELECT 
+        `SELECT SQL_NO_CACHE
           s.*,
           COALESCE(NULLIF(u.email, ''), s.email) as email
         FROM stores s

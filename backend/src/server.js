@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import logger from './config/logger.js';
 import pool from './config/database.js';
 import startFirestoreSync from './utils/firestoreSync.js';
+import { getEmailService } from './utils/emailService.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 
 // Routes
@@ -63,8 +64,10 @@ app.use(compression());
 app.use((req, res, next) => {
   if (req.method === 'GET') {
     //  CRITICAL: Admin endpoints must NOT be cached to prevent stale data
-    if (req.path.includes('/admin/') || req.path.includes('/dashboard')) {
-      res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    if (req.path.includes('/admin') || req.path.includes('/admins') || req.path.includes('/dashboard')) {
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
     } else {
       // Public endpoints can use cache (5 minutes)
       res.set('Cache-Control', 'public, max-age=300');
@@ -88,13 +91,13 @@ const globalLimiter = rateLimit({
 //  NEW: Per-user rate limiter (prevent one user from flooding)
 const userLimiter = rateLimit({
   keyGenerator: (req, res) => {
-    // Use user ID if authenticated, fallback to IP
-    if (req.user?.uid) return req.user.uid;
+    // Use user ID if authenticated (JWT now contains uid)
+    if (req.user?.id) return `user_${req.user.id}`;
     if (req.admin?.id) return `admin_${req.admin.id}`;
     return req.ip || 'unknown';
   },
   windowMs: 1 * 60 * 1000, // 1 minute window
-  max: 100, // max 100 requests per user per minute
+  max: 300, // 🔥 INCREASED from 100 to 300 requests per user per minute (previously was too restrictive)
   message: 'Too many requests from this user, please try again later.',
   standardHeaders: false,
   legacyHeaders: false,
@@ -107,6 +110,9 @@ app.use(userLimiter);
 
 // Static files for uploads
 app.use('/uploads', express.static('uploads'));
+
+// Static files for verification emails
+app.use(express.static('public'));
 
 // API Routes
 app.use('/api/v1/products', productRoutes);
@@ -140,10 +146,44 @@ const server = app.listen(PORT, async () => {
     // Test database connection
     const connection = await pool.getConnection();
     await connection.execute('SELECT 1');
+    
+    // Initialize required database columns
+    try {
+      // Ensure latitude and longitude columns exist
+      await connection.execute(`
+        ALTER TABLE delivery_requests 
+        ADD COLUMN IF NOT EXISTS latitude DECIMAL(10,8) NULL,
+        ADD COLUMN IF NOT EXISTS longitude DECIMAL(11,8) NULL
+      `);
+      logger.info('✓ Delivery request location columns verified');
+    } catch (dbErr) {
+      logger.warn('⚠ Could not verify location columns:', dbErr.message);
+    }
+    
+    // Ensure currency column exists
+    try {
+      await connection.execute(`
+        ALTER TABLE orders 
+        ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'USD'
+      `);
+      logger.info('✓ Orders currency column verified');
+    } catch (dbErr) {
+      logger.warn('⚠ Could not verify currency column:', dbErr.message);
+    }
+    
     connection.release();
     
     logger.info(` Server running on http://localhost:${PORT}`);
     logger.info(` Database connected successfully`);
+    
+    // Initialize email service
+    try {
+      await getEmailService();
+      logger.info('✓ Email service initialized');
+    } catch (e) {
+      logger.warn('⚠ Email service initialization warning:', e.message);
+    }
+    
     // Start Firestore -> MySQL sync task (if Firebase configured)
     try {
       startFirestoreSync();

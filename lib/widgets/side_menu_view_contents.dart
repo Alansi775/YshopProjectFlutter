@@ -1,25 +1,13 @@
 import 'package:flutter/material.dart';
+import 'dart:ui'; // For glassmorphism effects
 import 'package:provider/provider.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../services/api_service.dart';
 import '../screens/customers/settings_view.dart';
-// يجب استيراد شاشة تسجيل الدخول لاستخدامها في التوجيه
 import '../screens/auth/sign_in_view.dart'; 
+import '../screens/auth/sign_in_ui.dart'; // Import luxury theme
 import '../state_management/auth_manager.dart';
+import '../state_management/theme_manager.dart'; // Import theme manager
 import '../state_management/cart_manager.dart'; 
-
-// دالة مساعدة لخط "TenorSans" (مُعدّلة لاستخدام لون النص من الـ Theme عند عدم تحديد لون)
-TextStyle _getTenorSansStyle(double size, {FontWeight weight = FontWeight.normal, Color? color, required BuildContext context}) {
-  // اللون الافتراضي هو لون النص الأساسي للـ Theme الحالي
-  final defaultColor = Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black;
-  
-  return TextStyle(
-    fontFamily: 'TenorSans', 
-    fontSize: size,
-    fontWeight: weight,
-    color: color ?? defaultColor,
-  );
-}
 
 class SideMenuViewContents extends StatefulWidget {
   const SideMenuViewContents({Key? key}) : super(key: key);
@@ -33,27 +21,41 @@ class _SideMenuViewContentsState extends State<SideMenuViewContents> {
   String _name = "Guest";
   String _surname = "User";
   
-  final List<String> _categoryTabs = ["WOMEN", "MEN", "KIDS"];
-  final List<String> _categories = ["All", "Apparel", "Dress", "T-Shirt", "Bag"];
+  final List<String> _storeTypes = ["FASHION", "PHARMACY", "RESTAURANT", "MARKET"];
   
-  // لتقليل عمليات جلب البيانات
-  User? _lastCheckedUser;
+  late Map<String, List<String>> categoriesByType;
+
+  @override
+  void initState() {
+    super.initState();
+    
+    // Initialize categories by store type
+    categoriesByType = {
+      "FASHION": ["All", "Men", "Women", "Kids", "Shoes", "Accessories"],
+      "PHARMACY": ["All", "Pain Relief", "Cold & Flu", "Vitamins", "First Aid", "Skincare"],
+      "RESTAURANT": ["All", "Burgers", "Pizza", "Salads", "Desserts", "Beverages"],
+      "MARKET": ["All", "Fruits", "Vegetables", "Dairy", "Grains", "Beverages"],
+    };
+    
+    // Call immediately, no delay!
+    _fetchUserData();
+  }
 
   // منطق جلب بيانات المستخدم المصحح
-  void _fetchUserData() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == _lastCheckedUser && user != null) return;
-    _lastCheckedUser = user;
-
-    if (user == null) {
+  void _fetchUserData() {
+    final authManager = Provider.of<AuthManager>(context, listen: false);
+    
+    // If not authenticated, show Guest
+    if (!authManager.isAuthenticated) {
       if (mounted) setState(() { _name = 'Guest'; _surname = 'User'; });
       return;
     }
 
+    // If authenticated, get profile from cache (don't fetch from API here)
     try {
-      final profile = await ApiService.getUserProfile();
+      final profile = authManager.userProfile;
       if (profile != null && mounted) {
-        final display = (profile['display_name'] as String?) ?? (profile['displayName'] as String?) ?? '';
+        final display = (profile['display_name'] as String?) ?? '';
         String first = '';
         String last = '';
         if (display.isNotEmpty) {
@@ -61,362 +63,496 @@ class _SideMenuViewContentsState extends State<SideMenuViewContents> {
           first = parts.first;
           last = parts.length > 1 ? parts.sublist(1).join(' ') : '';
         }
+        
+        final name = (profile['name'] as String?) ?? (first.isNotEmpty ? first : 'User');
+        final surname = (profile['surname'] as String?) ?? last;
+        
+        debugPrint('📋 SideMenu - Updated from profile: name=$name, surname=$surname');
         setState(() {
-          _name = (profile['name'] as String?) ?? (first.isNotEmpty ? first : (user.displayName?.split(' ').first ?? user.email?.split('@').first ?? 'User'));
-          _surname = (profile['surname'] as String?) ?? last;
+          _name = name;
+          _surname = surname;
         });
       } else {
-        // backend missing profile — try syncing basic info from Firebase Auth
-        try {
-          await ApiService.syncUser(uid: user.uid, email: user.email ?? '', displayName: user.displayName ?? '');
-          final profile2 = await ApiService.getUserProfile();
-          if (profile2 != null && mounted) {
-            final display = (profile2['display_name'] as String?) ?? (profile2['displayName'] as String?) ?? '';
-            final parts = display.split(' ');
-            setState(() {
-              _name = parts.isNotEmpty ? parts.first : (user.displayName?.split(' ').first ?? user.email?.split('@').first ?? 'User');
-              _surname = parts.length > 1 ? parts.sublist(1).join(' ') : '';
-            });
-          }
-        } catch (e) {
-          if (mounted) setState(() { _name = user.displayName?.split(' ').first ?? user.email?.split('@').first ?? 'User'; _surname = user.displayName?.split(' ').last ?? ''; });
-        }
+        // No profile yet, use display_name
+        setState(() { _name = 'User'; _surname = ''; });
       }
     } catch (e) {
-      if (mounted) setState(() { _name = user.displayName?.split(' ').first ?? user.email?.split('@').first ?? 'User'; _surname = user.displayName?.split(' ').last ?? ''; });
+      debugPrint('Error fetching user data: $e');
+      setState(() { _name = 'User'; _surname = ''; });
     }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    // لا نحتاج لاستدعاء _fetchUserData() هنا، نعتمد على didChangeDependencies
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // الاستماع لتغييرات حالة تسجيل الدخول/الخروج
+    // استمع فقط للتغييرات، لا تستدعي _fetchUserData هنا
     Provider.of<AuthManager>(context, listen: true); 
-    _fetchUserData(); 
   }
   
   // MARK: - Components
 
-  Widget _buildUserProfileSection(BuildContext context) {
+  Widget _buildUserProfileSection(BuildContext context, bool isDark, Color liquidBg) {
     final authManager = Provider.of<AuthManager>(context, listen: false);
-    final isLoggedIn = authManager.currentUser != null;
+    final isLoggedIn = authManager.isAuthenticated;
     
-    // الحصول على لون النص الافتراضي من الـ Theme
-    final defaultTextColor = Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black;
+    final textColor = isDark 
+        ? LuxuryTheme.kPlatinum 
+        : LuxuryTheme.kDeepNavy;
 
-    return Row(
-      children: [
-        CircleAvatar(
-          radius: 28,
-          //  تحديث: استخدام لون خلفية يتغير مع الـ Theme
-          backgroundColor: Theme.of(context).dividerColor.withOpacity(0.5),
-          child: Icon(Icons.person_rounded, size: 30, color: defaultTextColor.withOpacity(0.7)), 
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: VStack(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          decoration: BoxDecoration(
+            color: liquidBg,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withOpacity(0.1)
+                  : Colors.white.withOpacity(0.15),
+            ),
+          ),
+          padding: const EdgeInsets.all(10),
+          child: Row(
             children: [
-              Text(
-                isLoggedIn ? '$_name $_surname' : 'Welcome Guest',
-                style: _getTenorSansStyle(16, weight: FontWeight.w600, context: context),
-                softWrap: true,
-                maxLines: 3,
+              CircleAvatar(
+                radius: 26,
+                backgroundColor: isDark 
+                    ? Colors.white.withOpacity(0.1)
+                    : Colors.black.withOpacity(0.1),
+                child: Icon(Icons.person_rounded, size: 28, color: textColor.withOpacity(0.7)), 
               ),
-              const SizedBox(height: 4),
-              Text(
-                isLoggedIn ? 'Account Settings' : 'Sign In / Register',
-                style: _getTenorSansStyle(12, color: Colors.grey, context: context),
-                softWrap: true,
-                maxLines: 2,
+              const SizedBox(width: 12),
+              Expanded(
+                child: VStack(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isLoggedIn ? '$_name $_surname' : 'Welcome Guest',
+                      style: TextStyle(
+                        fontFamily: 'TenorSans',
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: textColor,
+                        letterSpacing: 0.4,
+                      ),
+                      softWrap: true,
+                      maxLines: 2,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      isLoggedIn ? 'Account Settings' : 'Sign In / Register',
+                      style: TextStyle(
+                        fontFamily: 'TenorSans',
+                        fontSize: 11,
+                        color: isDark ? Colors.grey[400] : Colors.grey[600],
+                        letterSpacing: 0.2,
+                      ),
+                      softWrap: true,
+                      maxLines: 1,
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildCloseButton(BuildContext context) {
-    // لون البطاقة (Card Color) يتغير بين الأبيض والداكن
-    final cardColor = Theme.of(context).cardColor;
-    
-    return GestureDetector( 
-      onTap: () => Navigator.of(context).pop(), 
-      child: Container(
-        width: 32, 
-        height: 32, 
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          //  تحديث: استخدام لون البطاقة
-          color: cardColor, 
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              //  تحديث: استخدام لون الظل من الـ Theme
-              color: Theme.of(context).shadowColor.withOpacity(0.1),
-              blurRadius: 5,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: const Icon(Icons.close, size: 24, color: Colors.grey),
       ),
     );
   }
-  
-  Widget _buildCategorySelector() {
-     // استخدام context لتمريره إلى الدالة المساعدة
-     final BuildContext context = this.context; 
-     final dividerColor = Theme.of(context).dividerColor; // لون الفاصل/الحدود
 
-     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: List.generate(_categoryTabs.length, (index) {
-          final isSelected = _selectedCategoryIndex == index;
-          return Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: GestureDetector(
-              onTap: () {
-                setState(() {
-                  _selectedCategoryIndex = index;
-                });
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-                decoration: BoxDecoration(
-                  //  تحديث: استخدام الألوان الرئيسية من الـ Theme
-                  color: isSelected ? Theme.of(context).primaryColor : Colors.transparent, 
-                  borderRadius: BorderRadius.circular(20),
-                  border: isSelected ? null : Border.all(color: dividerColor, width: 1),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
-                            blurRadius: 8,
-                            offset: const Offset(0, 4),
-                          )
-                        ]
-                      : null,
-                ),
-                child: Text(
-                  _categoryTabs[index],
-                  //  تحديث: تمرير context إلى الدالة
-                  style: _getTenorSansStyle(12, weight: FontWeight.w600, context: context).copyWith(
-                    // لون النص يصبح عكس لون الخلفية (أبيض في الداكن، أسود في الفاتح)
-                    color: isSelected ? Theme.of(context).colorScheme.background : Theme.of(context).textTheme.bodyLarge?.color,
-                  ),
-                ),
+  Widget _buildCloseButton(BuildContext context, bool isDark, Color liquidBg) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: GestureDetector( 
+          onTap: () => Navigator.of(context).pop(), 
+          child: Container(
+            width: 48, 
+            height: 48, 
+            decoration: BoxDecoration(
+              color: liquidBg,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withOpacity(0.1)
+                    : Colors.white.withOpacity(0.15),
               ),
             ),
-          );
-        }),
+            child: Icon(
+              Icons.close, 
+              size: 24, 
+              color: isDark ? Colors.white70 : Colors.black54,
+            ),
+          ),
+        ),
       ),
     );
   }
   
-  Widget _buildCategoryItem(String title, VoidCallback onTap) {
-    // الحصول على الألوان من الـ Theme
-    final cardColor = Theme.of(context).cardColor;
-    final shadowColor = Theme.of(context).shadowColor;
-    
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-        margin: const EdgeInsets.symmetric(horizontal: 16),
-        decoration: BoxDecoration(
-          //  تحديث: استخدام لون البطاقة
-          color: cardColor, 
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              //  تحديث: استخدام لون الظل
-              color: shadowColor.withOpacity(0.05), 
-              blurRadius: 8, 
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Text(
-              title,
-              //  تحديث: تمرير context إلى الدالة
-              style: _getTenorSansStyle(15, weight: FontWeight.w500, context: context),
-            ),
-            const Spacer(),
-            //  تحديث: أيقونة بلون يتوافق مع الـ Theme
-            Icon(Icons.chevron_right, size: 18, color: Theme.of(context).iconTheme.color?.withOpacity(0.5)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMenuFooter(BuildContext context) {
-    final authManager = Provider.of<AuthManager>(context); 
-    final isLoggedIn = authManager.currentUser != null;
-    
-    // الحصول على الألوان من الـ Theme
-    final cardColor = Theme.of(context).cardColor;
-    final shadowColor = Theme.of(context).shadowColor;
-    final dividerColor = Theme.of(context).dividerColor;
-
+  Widget _buildCategorySelector(bool isDark, Color liquidBg, Color liquidBorder) {
     return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Container(
-        decoration: BoxDecoration(
-          //  تحديث: استخدام لون البطاقة
-          color: cardColor, 
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              //  تحديث: استخدام لون الظل
-              color: shadowColor.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 5),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            decoration: BoxDecoration(
+              color: liquidBg,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: liquidBorder),
             ),
-          ],
-        ),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            // Menu Buttons
-            _buildMenuButton(
-              context,
-              icon: Icons.phone_rounded, 
-              text: "(+90) 39 255 4609",
-              onTap: () {},
-            ),
-            const SizedBox(height: 16),
-            _buildMenuButton(
-              context,
-              icon: Icons.location_on,
-              text: "Store Locator",
-              onTap: () {},
-            ),
-            const SizedBox(height: 16),
-            _buildMenuButton(
-              context,
-              icon: Icons.settings,
-              text: "Settings",
-              onTap: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).push(
-                  PageRouteBuilder(
-                    pageBuilder: (context, animation, secondaryAnimation) => const SettingsView(),
-                    transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                      return FadeTransition(
-                        opacity: animation.drive(Tween(begin: 0.0, end: 1.0)),
-                        child: child,
-                      );
-                    },
-                    transitionDuration: const Duration(milliseconds: 250), // سرعة الانتقال
+            padding: const EdgeInsets.all(8),
+            child: Column(
+              children: List.generate(_storeTypes.length, (index) {
+                final isSelected = _selectedCategoryIndex == index;
+                return GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _selectedCategoryIndex = index;
+                    });
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                    margin: const EdgeInsets.only(bottom: 6),
+                    decoration: BoxDecoration(
+                      color: isSelected 
+                          ? LuxuryTheme.kLightBlueAccent.withOpacity(0.8)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      _storeTypes[index],
+                      style: TextStyle(
+                        fontFamily: 'TenorSans',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.8,
+                        color: isSelected 
+                            ? Colors.white 
+                            : (isDark ? Colors.white60 : Colors.black54),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
                   ),
                 );
-              },
+              }),
             ),
-            
-            const SizedBox(height: 24),
-            //  تحديث: استخدام لون الفاصل
-            Divider(height: 1, color: dividerColor), 
-            const SizedBox(height: 24),
-
-            // Logout/Login Button
-            TextButton(
-              onPressed: () async {
-                if (isLoggedIn) {
-                  //  Clear cart manager before logout
-                  final cartManager = context.read<CartManager>();
-                  await cartManager.clearCart();
-                  
-                  await authManager.signOut();
-                  
-                  if (mounted) {
-                    //  تم تصحيح الخطأ: حذف كلمة const من أمام SignInView
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (context) => const SignInView()),
-                      (Route<dynamic> route) => false,
-                    );
-                  }
-                } else {
-                  Navigator.of(context).pop(); 
-                  // توجيه المستخدم لصفحة تسجيل الدخول
-                  Navigator.of(context).push(
-                    //  تم تصحيح الخطأ: حذف كلمة const من أمام SignInView
-                    MaterialPageRoute(builder: (context) => const SignInView()),
-                  );
-                }
-              },
-              style: TextButton.styleFrom(
-                padding: EdgeInsets.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              //  تم تصحيح الخطأ: إضافة الوسيط child
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  color: isLoggedIn ? Colors.red.withOpacity(0.1) : Colors.green.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      isLoggedIn ? "Logout" : "Sign In",
-                      style: _getTenorSansStyle(14, weight: FontWeight.w600, context: context).copyWith(color: isLoggedIn ? Colors.red : Colors.green),
-                    ),
-                    const SizedBox(width: 12),
-                    Icon(isLoggedIn ? Icons.logout : Icons.login, size: 20, color: isLoggedIn ? Colors.red : Colors.green),
-                  ],
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
   
-  Widget _buildMenuButton(BuildContext context, {required IconData icon, required String text, required VoidCallback onTap}) {
-    // الحصول على الألوان من الـ Theme
-    final primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
-    final buttonColor = Theme.of(context).dividerColor.withOpacity(0.5); // لون خلفية خفيف
+  Widget _buildCategoryItem(String title, bool isDark, Color liquidBg, Color liquidBorder, VoidCallback onTap) {
+    final textColor = isDark 
+        ? LuxuryTheme.kPlatinum 
+        : LuxuryTheme.kDeepNavy;
 
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          //  تحديث: استخدام لون خلفية يتغير مع الـ Theme
-          color: buttonColor,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            //  تحديث: أيقونة بلون يتوافق مع الـ Theme
-            Icon(icon, size: 24, color: Theme.of(context).iconTheme.color?.withOpacity(0.7)),
-            const SizedBox(width: 16),
-            Expanded( 
-              child: Text(
-                text,
-                //  تحديث: تمرير context إلى الدالة
-                style: _getTenorSansStyle(14, context: context).copyWith(color: primaryTextColor),
-                overflow: TextOverflow.ellipsis,
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              decoration: BoxDecoration(
+                color: liquidBg,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: liquidBorder),
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontFamily: 'TenorSans',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: textColor,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  const Spacer(),
+                  Icon(
+                    Icons.chevron_right, 
+                    size: 18, 
+                    color: isDark ? Colors.white38 : Colors.black26,
+                  ),
+                ],
               ),
             ),
-            //  تحديث: أيقونة بلون يتوافق مع الـ Theme
-            Icon(Icons.chevron_right, size: 16, color: Theme.of(context).iconTheme.color?.withOpacity(0.5)),
-          ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMenuFooter(BuildContext context, bool isDark, Color liquidBg, Color liquidBorder) {
+    final authManager = Provider.of<AuthManager>(context); 
+    final isLoggedIn = authManager.isAuthenticated;
+    
+    final textColor = isDark 
+        ? LuxuryTheme.kPlatinum 
+        : LuxuryTheme.kDeepNavy;
+
+    return Padding(
+      padding: const EdgeInsets.all(12.0),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            decoration: BoxDecoration(
+              color: liquidBg,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: liquidBorder),
+            ),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                // Support Button (Centered and featured)
+                _buildSupportButton(context, isDark, liquidBg, liquidBorder, textColor),
+                const SizedBox(height: 16),
+                
+                // Settings Button
+                _buildMenuButton(
+                  context,
+                  icon: Icons.settings,
+                  text: "Settings",
+                  isDark: isDark,
+                  textColor: textColor,
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).push(
+                      PageRouteBuilder(
+                        pageBuilder: (context, animation, secondaryAnimation) => const SettingsView(),
+                        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                          return FadeTransition(
+                            opacity: animation.drive(Tween(begin: 0.0, end: 1.0)),
+                            child: child,
+                          );
+                        },
+                        transitionDuration: const Duration(milliseconds: 250),
+                      ),
+                    );
+                  },
+                ),
+                
+                const SizedBox(height: 16),
+                Divider(
+                  height: 1, 
+                  color: isDark 
+                      ? Colors.white.withOpacity(0.1)
+                      : Colors.black.withOpacity(0.1),
+                ), 
+                const SizedBox(height: 16),
+
+                // Logout/Login Button
+                TextButton(
+                  onPressed: () async {
+                    if (isLoggedIn) {
+                      final cartManager = context.read<CartManager>();
+                      await cartManager.clearCart();
+                      
+                      await authManager.signOut();
+                      
+                      if (mounted) {
+                        Navigator.of(context).pushAndRemoveUntil(
+                          MaterialPageRoute(builder: (context) => const SignInView()),
+                          (Route<dynamic> route) => false,
+                        );
+                      }
+                    } else {
+                      Navigator.of(context).pop(); 
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (context) => const SignInView()),
+                      );
+                    }
+                  },
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: isLoggedIn 
+                              ? Colors.red.withOpacity(0.15)
+                              : Colors.green.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isLoggedIn 
+                                ? Colors.red.withOpacity(0.3)
+                                : Colors.green.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              isLoggedIn ? "Logout" : "Sign In",
+                              style: TextStyle(
+                                fontFamily: 'TenorSans',
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: isLoggedIn ? Colors.red[400] : Colors.green[400],
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Icon(
+                              isLoggedIn ? Icons.logout : Icons.login, 
+                              size: 18, 
+                              color: isLoggedIn ? Colors.red[400] : Colors.green[400],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildSupportButton(BuildContext context, bool isDark, Color liquidBg, Color liquidBorder, Color textColor) {
+    return GestureDetector(
+      onTap: () {
+        // Call support number
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: liquidBg,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: liquidBorder),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Support Label
+                  Text(
+                    'Support',
+                    style: TextStyle(
+                      fontFamily: 'TenorSans',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: LuxuryTheme.kLightBlueAccent,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  
+                  // Phone Number (Main)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.phone_rounded,
+                        size: 20,
+                        color: LuxuryTheme.kLightBlueAccent,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        '+90 539 255 4609',
+                        style: TextStyle(
+                          fontFamily: 'TenorSans',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: textColor,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMenuButton(
+    BuildContext context, {
+    required IconData icon, 
+    required String text, 
+    required bool isDark,
+    required Color textColor,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: isDark 
+                  ? Colors.white.withOpacity(0.03)
+                  : Colors.black.withOpacity(0.03),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withOpacity(0.08)
+                    : Colors.black.withOpacity(0.08),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  icon, 
+                  size: 24, 
+                  color: LuxuryTheme.kLightBlueAccent,
+                ),
+                const SizedBox(width: 16),
+                Expanded( 
+                  child: Text(
+                    text,
+                    style: TextStyle(
+                      fontFamily: 'TenorSans',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: textColor,
+                      letterSpacing: 0.5,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right, 
+                  size: 16, 
+                  color: isDark ? Colors.white.withOpacity(0.24) : Colors.black.withOpacity(0.24),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -424,29 +560,50 @@ class _SideMenuViewContentsState extends State<SideMenuViewContents> {
 
   @override
   Widget build(BuildContext context) {
-    // لون خلفية الـ Scaffold (القائمة الجانبية)
-    final scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
+    final themeManager = Provider.of<ThemeManager>(context);
+    final isDark = themeManager.isDarkMode;
+    
+    // Liquid Glass Colors
+    final backgroundColor = isDark 
+        ? LuxuryTheme.kDarkBackground 
+        : LuxuryTheme.kLightBackground;
+    
+    final liquidBg = isDark 
+        ? Colors.white.withOpacity(0.05)
+        : Colors.white.withOpacity(0.08);
+    
+    final liquidBorder = isDark 
+        ? Colors.white.withOpacity(0.1)
+        : Colors.white.withOpacity(0.15);
+    
     final screenWidth = MediaQuery.of(context).size.width;
     final menuWidth = screenWidth > 600 ? 300.0 : screenWidth * 0.8; 
     
     return SizedBox(
       width: menuWidth, 
       child: Container(
-        //  تحديث: استخدام لون خلفية الـ Scaffold
-        color: scaffoldColor, 
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: isDark 
+                ? [const Color(0xFF0A0A0A), const Color(0xFF1A1A1A)]
+                : [const Color(0xFFF5F5F5), const Color(0xFFE8E8E8)],
+          ),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            // Header
+            // Header with Liquid Glass effect
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 50, 24, 30),
+              padding: const EdgeInsets.fromLTRB(24, 40, 24, 20),
               child: Row(
                 children: [
                   Expanded( 
-                    child: _buildUserProfileSection(context),
+                    child: _buildUserProfileSection(context, isDark, liquidBg),
                   ),
                   const SizedBox(width: 10),
-                  _buildCloseButton(context),
+                  _buildCloseButton(context, isDark, liquidBg),
                 ],
               ),
             ),
@@ -457,19 +614,26 @@ class _SideMenuViewContentsState extends State<SideMenuViewContents> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildCategorySelector(),
+                    _buildCategorySelector(isDark, liquidBg, liquidBorder),
                     
-                    // Category Items List
-                    ..._categories.map((category) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8.0),
-                      child: _buildCategoryItem(category, () {
-                        Navigator.of(context).pop(); 
-                      }),
-                    )).toList(),
+                    // Category Items List (Dynamic based on selected store type)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Column(
+                        children: categoriesByType[_storeTypes[_selectedCategoryIndex]]!
+                            .map((category) => Padding(
+                              padding: const EdgeInsets.only(bottom: 6),
+                              child: _buildCategoryItem(category, isDark, liquidBg, liquidBorder, () {
+                                Navigator.of(context).pop(); 
+                              }),
+                            ))
+                            .toList(),
+                      ),
+                    ),
 
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 20),
                     
-                    _buildMenuFooter(context),
+                    _buildMenuFooter(context, isDark, liquidBg, liquidBorder),
                     const SizedBox(height: 20),
                   ],
                 ),

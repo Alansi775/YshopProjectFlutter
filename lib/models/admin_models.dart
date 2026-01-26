@@ -1,7 +1,5 @@
 // lib/models/admin_models.dart
 
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class StoreRequest {
   final String id;
   final String storeName;
@@ -22,19 +20,18 @@ class StoreRequest {
     required this.storePhone,
     required this.status,
   });
-  
-  factory StoreRequest.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+
+  //  Factory for backend API (MySQL)
+  factory StoreRequest.fromJson(Map<String, dynamic> json) {
     return StoreRequest(
-      id: doc.id,
-      storeName: data["storeName"] as String? ?? "",
-      storeType: data["storeType"] as String? ?? "",
-      address: data["address"] as String? ?? "",
-      email: data["email"] as String? ?? "",
-      // لا يجب جلب كلمة المرور
-      storeIconUrl: data["storeIconUrl"] as String? ?? "",
-      storePhone: data["storePhoneNumber"] as String? ?? "",
-      status: data["status"] as String? ?? "Pending",
+      id: json["id"]?.toString() ?? "",
+      storeName: json["name"] as String? ?? "",
+      storeType: json["store_type"] as String? ?? "",
+      address: json["address"] as String? ?? "",
+      email: json["email"] as String? ?? "",
+      storeIconUrl: json["icon_url"] as String? ?? "",
+      storePhone: json["phone"] as String? ?? "",
+      status: json["status"] as String? ?? "Pending",
     );
   }
 }
@@ -50,6 +47,8 @@ class ProductSS {
     final String storePhone;
     final String status;
     final bool approved;
+    final int? categoryId;
+    final String? categoryName;
 
     ProductSS({
       required this.id,
@@ -62,21 +61,25 @@ class ProductSS {
       required this.storePhone,
       required this.status,
       required this.approved,
+      this.categoryId,
+      this.categoryName,
     });
     
-    factory ProductSS.fromFirestore(DocumentSnapshot doc) {
-      final data = doc.data() as Map<String, dynamic>;
+    //  Factory for backend API (MySQL)
+    factory ProductSS.fromJson(Map<String, dynamic> json) {
       return ProductSS(
-        id: doc.id,
-        storeName: data["storeName"] as String? ?? "",
-        name: data["name"] as String? ?? "",
-        price: (data["price"] is num) ? data["price"].toStringAsFixed(2) : data["price"] as String? ?? "0.00",
-        description: data["description"] as String? ?? "",
-        imageUrl: data["imageUrl"] as String?,
-        storeOwnerEmail: data["storeOwnerEmail"] as String? ?? "",
-        storePhone: data["storePhone"] as String? ?? "No Phone",
-        status: data["status"] as String? ?? "Pending",
-        approved: data["approved"] as bool? ?? false,
+        id: json["id"]?.toString() ?? "",
+        storeName: json["store_name"] as String? ?? "",
+        name: json["name"] as String? ?? "",
+        price: (json["price"] is num) ? json["price"].toStringAsFixed(2) : json["price"] as String? ?? "0.00",
+        description: json["description"] as String? ?? "",
+        imageUrl: json["image_url"] as String?,
+        storeOwnerEmail: json["store_owner_email"] as String? ?? "",
+        storePhone: json["store_phone"] as String? ?? "No Phone",
+        status: json["status"] as String? ?? "Pending",
+        approved: json["approved"] as bool? ?? false,
+        categoryId: json["category_id"] as int?,
+        categoryName: json["category_name"] as String?,
       );
     }
 }

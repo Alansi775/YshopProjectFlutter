@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/api_service.dart';
 import '../../widgets/store_admin_widgets.dart';
 import '../../models/currency.dart';
@@ -57,11 +56,6 @@ class _EditProductViewState extends State<EditProductView> {
     setState(() => _isLoading = true);
 
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        throw Exception("User not logged in.");
-      }
-
       await ApiService.updateProduct(
         widget.product.id,
         name: _nameController.text.trim(),

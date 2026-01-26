@@ -3,11 +3,11 @@ import 'package:flutter/services.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import '../../services/api_service.dart';
 import 'package:provider/provider.dart';
+import '../../services/api_service.dart';
 import '../../widgets/multi_media_picker.dart';
 import '../../models/currency.dart';
+import '../../state_management/auth_manager.dart';
 
 class AddProductView extends StatefulWidget {
   const AddProductView({super.key});
@@ -46,10 +46,12 @@ class _AddProductViewState extends State<AddProductView> {
     setState(() => _isLoading = true);
 
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) throw Exception("User not logged in.");
+      final authManager = Provider.of<AuthManager>(context, listen: false);
+      final uid = authManager.userProfile?['uid'] as String?;
+      
+      if (uid == null) throw Exception("User not logged in.");
 
-      final storeResponse = await ApiService.getUserStore(uid: user.uid);
+      final storeResponse = await ApiService.getUserStore(uid: uid);
       final storeId = storeResponse?['id'] ?? 1;
 
       final productData = {
@@ -208,11 +210,17 @@ class _AddProductViewState extends State<AddProductView> {
                               hintText: "0.00",
                             ),
                             validator: (v) => v!.isEmpty ? 'Required' : null,
+                            onChanged: (_) => setState(() {}), // Trigger rebuild to update revenue breakdown
                           ),
                         ),
                       ],
                     ),
                   ),
+
+                  const SizedBox(height: 16),
+
+                  // --- Revenue Breakdown Display ---
+                  _buildRevenueBreakdown(),
 
                   const SizedBox(height: 30),
 
@@ -353,6 +361,174 @@ class _AddProductViewState extends State<AddProductView> {
       child: Padding(
         padding: const EdgeInsets.all(8.0),
         child: Icon(icon, size: 18, color: _textPrimary),
+      ),
+    );
+  }
+
+  // 💰 Revenue Breakdown Widget
+  Widget _buildRevenueBreakdown() {
+    final double price = double.tryParse(_priceController.text) ?? 0.0;
+    
+    // Revenue calculation constants
+    const double STORE_RATE = 0.65;        // 65% for store owner
+    const double APP_DRIVER_RATE = 0.35;   // 35% for YSHOP + Driver combined
+    
+    final storeEarning = price * STORE_RATE;
+    final appDriverEarning = price * APP_DRIVER_RATE;
+    final symbol = _selectedCurrency.symbol;
+    
+    if (price <= 0) {
+      return Container(
+        decoration: _modernBoxDecoration(),
+        padding: const EdgeInsets.all(16),
+        child: Center(
+          child: Text(
+            "Enter a price to see revenue breakdown",
+            style: TextStyle(color: _textSecondary, fontSize: 13, fontStyle: FontStyle.italic),
+          ),
+        ),
+      );
+    }
+    
+    return Container(
+      decoration: _modernBoxDecoration(),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Revenue Breakdown",
+            style: TextStyle(
+              color: _textPrimary,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 16),
+          
+          // Store Owner Earning
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 4,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade500,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Your Earning",
+                        style: TextStyle(color: _textSecondary, fontSize: 12),
+                      ),
+                      Text(
+                        "65% of price",
+                        style: TextStyle(color: _textSecondary.withOpacity(0.7), fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade500.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green.shade500.withOpacity(0.5)),
+                ),
+                child: Text(
+                  "$symbol${storeEarning.toStringAsFixed(2)}",
+                  style: TextStyle(
+                    color: Colors.green.shade500,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // YSHOP + Driver Combined
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 4,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade500,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "YSHOP + Delivery",
+                        style: TextStyle(color: _textSecondary, fontSize: 12),
+                      ),
+                      Text(
+                        "35% of price (25% + 10%)",
+                        style: TextStyle(color: _textSecondary.withOpacity(0.7), fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade500.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.shade500.withOpacity(0.5)),
+                ),
+                child: Text(
+                  "$symbol${appDriverEarning.toStringAsFixed(2)}",
+                  style: TextStyle(
+                    color: Colors.blue.shade500,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 12),
+          Divider(color: _textSecondary.withOpacity(0.2)),
+          const SizedBox(height: 12),
+          
+          // Total Price
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                "Total Price",
+                style: TextStyle(color: _textPrimary, fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+              Text(
+                "$symbol${price.toStringAsFixed(2)}",
+                style: TextStyle(
+                  color: _textPrimary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

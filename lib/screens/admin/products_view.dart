@@ -56,6 +56,7 @@ class _ProductsManagementViewState extends State<ProductsManagementView> with Si
   }
 
   Future<void> _loadProducts() async {
+    debugPrint('📥 [_loadProducts] Starting to load products from backend...');
     setState(() => _isLoading = true);
     try {
       //  Clear cache first to ensure fresh data
@@ -79,6 +80,8 @@ class _ProductsManagementViewState extends State<ProductsManagementView> with Si
                 'status': p['status'] ?? 'pending', //  Read from API
                 'owner_email': p['owner_email'],
                 'store_phone': p['store_phone'],
+                'category_id': p['category_id'],  //  Map category_id
+                'category_name': p['category_name'],  //  Map category_name
               })).toList() ?? [];
 
           //  FIXED: Now using getApprovedProducts() which returns ONLY approved products
@@ -94,13 +97,17 @@ class _ProductsManagementViewState extends State<ProductsManagementView> with Si
                 'status': p['status'] ?? 'approved', //  Read from API
                 'owner_email': p['owner_email'],
                 'store_phone': p['store_phone'],
+                'category_id': p['category_id'],  //  Map category_id
+                'category_name': p['category_name'],  //  Map category_name
               })).toList() ?? [];
 
           _isLoading = false;
+          
+          debugPrint('📥 [_loadProducts] Loaded ${_pendingProducts.length} pending + ${_approvedProducts.length} approved');
         });
       }
     } catch (e) {
-      debugPrint('Error loading products: $e');
+      debugPrint('❌ [_loadProducts] Error: $e');
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -134,10 +141,9 @@ class _ProductsManagementViewState extends State<ProductsManagementView> with Si
         });
         // Clear cache for next load
         ApiService.clearCache();
-        ApiService.clearPendingRequests();
         //  Wait for backend to update before next action (same as stores)
         await Future.delayed(const Duration(milliseconds: 1000));
-        //  Reload products immediately in this view to avoid cache issues
+        //  Reload products from backend to sync state
         await _loadProducts();
         //  Notify parent (Dashboard) to refresh counts
         widget.onProductUpdated?.call();
@@ -187,10 +193,9 @@ class _ProductsManagementViewState extends State<ProductsManagementView> with Si
         });
         // Clear cache for next load
         ApiService.clearCache();
-        ApiService.clearPendingRequests();
         //  Wait for backend to update before next action (same as stores)
         await Future.delayed(const Duration(milliseconds: 1000));
-        //  Reload products immediately in this view to avoid cache issues
+        //  Reload products from backend to sync state
         await _loadProducts();
         //  Notify parent (Dashboard) to refresh counts
         widget.onProductUpdated?.call();
@@ -235,8 +240,14 @@ class _ProductsManagementViewState extends State<ProductsManagementView> with Si
           );
           _pendingProducts.insert(0, suspendedProduct);
         });
-        //  Only clear cache, don't reload (avoid race condition)
+        //  Clear cache for next load
         ApiService.clearCache();
+        //  Wait for backend to update before next action (same as stores)
+        await Future.delayed(const Duration(milliseconds: 1000));
+        //  Reload products from backend to sync state
+        await _loadProducts();
+        //  Notify parent (Dashboard) to refresh counts
+        widget.onProductUpdated?.call();
       }
     } catch (e) {
       if (mounted) {
@@ -410,6 +421,17 @@ class _ProductsManagementViewState extends State<ProductsManagementView> with Si
       );
     }
 
+    // Group products by store, then by category within each store
+    final Map<String, Map<String, List<ProductSS>>> groupedByStoreAndCategory = {};
+    for (final product in filtered) {
+      final storeKey = '${product.storeId}|${product.storeName}'; // Use ID and name
+      final categoryKey = product.categoryName ?? 'Uncategorized';
+      
+      groupedByStoreAndCategory.putIfAbsent(storeKey, () => {});
+      groupedByStoreAndCategory[storeKey]!.putIfAbsent(categoryKey, () => []);
+      groupedByStoreAndCategory[storeKey]![categoryKey]!.add(product);
+    }
+
     return RefreshIndicator(
       onRefresh: _loadProducts,
       color: kAccentBlue,
@@ -423,27 +445,44 @@ class _ProductsManagementViewState extends State<ProductsManagementView> with Si
                       ? 2
                       : 1;
 
-          return GridView.builder(
+          return SingleChildScrollView(
             padding: const EdgeInsets.all(24),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: crossAxisCount,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: 0.72,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Expanded category sections for each store
+                ...groupedByStoreAndCategory.entries.map((storeEntry) {
+                  final storeInfo = storeEntry.key.split('|');
+                  final storeName = storeInfo.length > 1 ? storeInfo[1] : 'Unknown Store';
+                  final categoriesInStore = storeEntry.value;
+                  final totalProductsInStore = categoriesInStore.values.fold<int>(0, (sum, list) => sum + list.length);
+                  
+                  return _StoreSection(
+                    storeName: storeName,
+                    totalProducts: totalProductsInStore,
+                    categoriesInStore: categoriesInStore,
+                    crossAxisCount: crossAxisCount,
+                    onProductTap: _showProductDetails,
+                    onApprove: (product) {
+                      final role = ApiService.cachedAdminRole?.toLowerCase() ?? 'admin';
+                      if (role != 'user') {
+                        if (product.approved) {
+                          _suspendProduct(product);
+                        } else {
+                          _approveProduct(product);
+                        }
+                      }
+                    },
+                    onDelete: (product) {
+                      final role = ApiService.cachedAdminRole?.toLowerCase() ?? 'admin';
+                      if (role == 'superadmin') {
+                        _deleteProduct(product);
+                      }
+                    },
+                  );
+                }).toList(),
+              ],
             ),
-            itemCount: filtered.length,
-            itemBuilder: (context, index) {
-              final product = filtered[index];
-              final role = ApiService.cachedAdminRole?.toLowerCase() ?? 'admin';
-              return _ProductCard(
-                product: product,
-                onTap: () => _showProductDetails(product),
-                onApprove: role == 'user'
-                    ? null
-                    : (product.approved ? () { _suspendProduct(product); } : () { _approveProduct(product); }),
-                onDelete: role == 'superadmin' ? () { _deleteProduct(product); } : null,
-              );
-            },
           );
         },
       ),
@@ -899,6 +938,284 @@ class _InfoCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  STORE HEADER BOX (Square Grid)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _StoreHeaderBox extends StatelessWidget {
+  final String storeName;
+  final int totalProducts;
+  final String storeKey;
+  final VoidCallback onTap;
+
+  const _StoreHeaderBox({
+    required this.storeName,
+    required this.totalProducts,
+    required this.storeKey,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: AppGradients.primary,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: kAccentBlue.withOpacity(0.25),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        constraints: const BoxConstraints.expand(), // Expand to fill grid cell
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Store icon
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.storefront_rounded,
+                color: Colors.white,
+                size: 32,
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Store name
+            Text(
+              storeName,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 8),
+            // Product count badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '$totalProducts ${totalProducts == 1 ? 'item' : 'items'}',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.9),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  STORE SECTION (Expandable with Categories)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _StoreSection extends StatefulWidget {
+  final String storeName;
+  final int totalProducts;
+  final Map<String, List<ProductSS>> categoriesInStore;
+  final int crossAxisCount;
+  final Function(ProductSS) onProductTap;
+  final Function(ProductSS) onApprove;
+  final Function(ProductSS) onDelete;
+
+  const _StoreSection({
+    required this.storeName,
+    required this.totalProducts,
+    required this.categoriesInStore,
+    required this.crossAxisCount,
+    required this.onProductTap,
+    required this.onApprove,
+    required this.onDelete,
+  });
+
+  @override
+  State<_StoreSection> createState() => _StoreSectionState();
+}
+
+class _StoreSectionState extends State<_StoreSection> {
+  bool _isExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Store header (clickable to expand/collapse)
+        GestureDetector(
+          onTap: () => setState(() => _isExpanded = !_isExpanded),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            decoration: BoxDecoration(
+              gradient: AppGradients.primary,
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                  color: kAccentBlue.withOpacity(0.2),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                // Store icon
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.storefront_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                // Store name and count
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.storeName,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        '${widget.totalProducts} pending product${widget.totalProducts != 1 ? 's' : ''}',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.85),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Expand/collapse icon
+                Icon(
+                  _isExpanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ],
+            ),
+          ),
+        ),
+        
+        // Expanded categories section
+        if (_isExpanded)
+          Padding(
+            padding: const EdgeInsets.only(top: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Build each category within this store
+                ...widget.categoriesInStore.entries.map((catEntry) {
+                  final categoryName = catEntry.key;
+                  final categoryProducts = catEntry.value;
+                  
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Category header
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12, left: 4),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: kCardBackground,
+                                border: Border.all(color: kAccentBlue, width: 1),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Text(
+                                categoryName,
+                                style: const TextStyle(
+                                  color: kAccentBlue,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: kGlassBackground,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '${categoryProducts.length}',
+                                style: const TextStyle(
+                                  color: kSecondaryTextColor,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Products grid for this category
+                      GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: widget.crossAxisCount,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                          childAspectRatio: 0.72,
+                        ),
+                        itemCount: categoryProducts.length,
+                        itemBuilder: (context, index) {
+                          final product = categoryProducts[index];
+                          return _ProductCard(
+                            product: product,
+                            onTap: () => widget.onProductTap(product),
+                            onApprove: () => widget.onApprove(product),
+                            onDelete: () => widget.onDelete(product),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                  );
+                }).toList(),
+              ],
+            ),
+          ),
+        
+        const SizedBox(height: 16),
+      ],
     );
   }
 }

@@ -4,7 +4,12 @@ import logger from '../config/logger.js';
 export class ProductController {
   static async getAll(req, res, next) {
     try {
-      const { page = 1, limit = 20, storeId, storeOwnerUid, categoryId, search, includeUnapproved } = req.query;
+      const { page = 1, limit = 100, storeId, storeOwnerUid, categoryId, search, includeUnapproved } = req.query;
+
+      // Set cache-busting headers for products (same as admin)
+      res.setHeader('Cache-Control', 'max-age=0, no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
 
       const products = await Product.findAll(
         { storeId, storeOwnerUid, categoryId, search, includeInactive: includeUnapproved === '1' || includeUnapproved === 'true' },
@@ -142,7 +147,7 @@ export class ProductController {
   // Get pending products
   static async getPendingProducts(req, res, next) {
     try {
-      const { page = 1, limit = 20 } = req.query;
+      const { page = 1, limit = 100 } = req.query;
 
       const products = await Product.findByStatus('pending', parseInt(page), parseInt(limit));
 
@@ -153,6 +158,9 @@ export class ProductController {
         image_url: product.image_url ? (product.image_url.startsWith('http') ? product.image_url : `${baseUrl}${product.image_url}`) : null
       }));
 
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
       res.json({
         success: true,
         data: productsWithFullUrls,
@@ -167,7 +175,7 @@ export class ProductController {
   //  NEW: Get approved products (admin endpoint)
   static async getApprovedProducts(req, res, next) {
     try {
-      const { page = 1, limit = 20 } = req.query;
+      const { page = 1, limit = 100 } = req.query;
 
       const products = await Product.findByStatus('approved', parseInt(page), parseInt(limit));
 
@@ -178,6 +186,9 @@ export class ProductController {
         image_url: product.image_url ? (product.image_url.startsWith('http') ? product.image_url : `${baseUrl}${product.image_url}`) : null
       }));
 
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
       res.json({
         success: true,
         data: productsWithFullUrls,
@@ -226,7 +237,7 @@ export class ProductController {
   static async getStoreProductsAdmin(req, res, next) {
     try {
       const { storeId } = req.params;
-      const { page = 1, limit = 50 } = req.query;
+      const { page = 1, limit = 100 } = req.query;
 
       if (!storeId) {
         return res.status(400).json({

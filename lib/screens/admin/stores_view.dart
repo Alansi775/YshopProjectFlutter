@@ -15,7 +15,7 @@ import 'widgets.dart' as w;
 
 class StoresManagementView extends StatefulWidget {
   final void Function(StoreRequest store)? onOpenStore;
-  final VoidCallback? onStoreUpdated; //  Callback to notify parent when store is updated
+  final VoidCallback? onStoreUpdated;
   final int initialTabIndex;
 
   const StoresManagementView({
@@ -31,10 +31,22 @@ class StoresManagementView extends StatefulWidget {
 
 class _StoresManagementViewState extends State<StoresManagementView> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  List<StoreRequest> _approvedStores = [];
-  List<StoreRequest> _pendingStores = [];
+  List<StoreRequest> _allStores = []; //  NEW: Store all stores in one list
   bool _isLoading = true;
   String _searchQuery = '';
+
+  //  Computed getters that filter from _allStores
+  List<StoreRequest> get _approvedStores {
+    return _allStores.where((s) => 
+      s.status.toLowerCase() == 'approved'
+    ).toList();
+  }
+
+  List<StoreRequest> get _pendingStores {
+    return _allStores.where((s) => 
+      s.status.toLowerCase() != 'approved'
+    ).toList();
+  }
 
   @override
   void initState() {
@@ -50,69 +62,82 @@ class _StoresManagementViewState extends State<StoresManagementView> with Single
   }
 
   Future<void> _loadStores() async {
+    debugPrint('📥 [_loadStores] Starting to load stores from backend...');
     setState(() => _isLoading = true);
     try {
-      //  Clear cache first to ensure fresh data
       ApiService.clearCache();
+      ApiService.clearPendingRequests();
+      
+      await Future.delayed(const Duration(milliseconds: 100));
       
       final role = ApiService.cachedAdminRole?.toLowerCase() ?? 'admin';
-      List<dynamic> approvedResp = [];
-      List<dynamic> pendingResp = [];
+      List<dynamic> allStoresResponse = [];
 
       if (role == 'user') {
-        // regular users see public stores (approved only)
-        approvedResp = await ApiService.getStores(page: 1, limit: 100);
-        pendingResp = [];
+        // Regular users see public stores only
+        allStoresResponse = await ApiService.getStores(page: 1, limit: 100);
       } else {
-        approvedResp = await ApiService.getApprovedStores();
-        pendingResp = await ApiService.getPendingStores();
+        // 🔥 CRITICAL FIX: Use getAllStoresAdmin() which reads REAL status from database
+        // This is the correct way to get all stores with their actual status
+        allStoresResponse = await ApiService.getAllStoresAdmin();
       }
       
       if (mounted) {
         setState(() {
-          //  FIX: Read status from API response, don't hardcode it!
-          _approvedStores = (approvedResp as List?)?.map((s) => StoreRequest.fromMap({
-            'id': s['id'],
-            'owner_uid': s['owner_uid'],
-            'name': s['name'],
-            'store_type': s['store_type'],
-            'address': s['address'],
-            'email': s['email'],
-            'icon_url': Store.getFullImageUrl(s['icon_url']),
-            'phone': s['phone'],
-            'status': s['status'] ?? 'Approved', //  Read from API, fallback to 'Approved'
-          })).toList() ?? [];
-          
-          //  FIX: Read status from API response for pending stores too
-          _pendingStores = (pendingResp as List?)?.map((s) => StoreRequest.fromMap({
-            'id': s['id'],
-            'owner_uid': s['owner_uid'],
-            'name': s['name'],
-            'store_type': s['store_type'],
-            'address': s['address'],
-            'email': s['email'],
-            'icon_url': Store.getFullImageUrl(s['icon_url']),
-            'phone': s['phone'],
-            'status': s['status'] ?? 'Pending', //  Read from API, fallback to 'Pending'
-          })).toList() ?? [];
+          //  Parse all stores into one list with their REAL status from DB
+          _allStores = allStoresResponse.map((s) {
+            final status = (s['status'] as String?)?.trim() ?? 'Pending';
+            
+            return StoreRequest.fromMap({
+              'id': s['id'],
+              'owner_uid': s['owner_uid'],
+              'name': s['name'],
+              'store_type': s['store_type'],
+              'address': s['address'],
+              'email': s['email'],
+              'icon_url': Store.getFullImageUrl(s['icon_url']),
+              'phone': s['phone'],
+              'status': status, //  Use REAL status from API
+            });
+          }).toList();
           
           _isLoading = false;
+          
+          // Debug: Print stores and their statuses
+          debugPrint('📥 [_loadStores] Loaded ${_allStores.length} total stores from backend');
+          debugPrint(' Approved: ${_approvedStores.length}');
+          debugPrint('⏳ Pending/Rejected: ${_pendingStores.length}');
+          for (var store in _allStores) {
+            debugPrint('  - ${store.storeName}: ${store.status}');
+          }
         });
       }
     } catch (e) {
-      debugPrint('Error loading stores: $e');
+      debugPrint('❌ Error loading stores: $e');
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _approveStore(StoreRequest store) async {
     try {
+      debugPrint(' [APPROVE] Starting approval for store: ${store.storeName} (ID: ${store.id})');
+      
       await ApiService.approveStore(store.id);
+      debugPrint(' [APPROVE] API call successful');
+      
       if (mounted) {
-        //  FIX: Create NEW StoreRequest with updated status = 'Approved'
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${store.storeName} approved successfully'),
+            backgroundColor: kAccentGreen,
+          ),
+        );
+        
+        //  OPTIMISTIC UPDATE: Change UI immediately
         setState(() {
+          debugPrint(' [APPROVE] Updating local state - removing from pending');
           _pendingStores.removeWhere((s) => s.id == store.id);
-          //  Create a new object with the correct status
+          
           final approvedStore = StoreRequest(
             id: store.id,
             ownerUid: store.ownerUid,
@@ -122,19 +147,33 @@ class _StoresManagementViewState extends State<StoresManagementView> with Single
             email: store.email,
             storeIconUrl: store.storeIconUrl,
             storePhone: store.storePhone,
-            status: 'Approved', //  Explicitly set to 'Approved'
+            status: 'Approved',
           );
           _approvedStores.insert(0, approvedStore);
+          debugPrint(' [APPROVE] Added to approved stores. Total approved: ${_approvedStores.length}');
+          
+          // Switch to approved tab
+          _tabController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
         });
-        // Clear cache for next load
+        
+        // Clear cache
         ApiService.clearCache();
-        //  Wait for backend to update before notifying parent
-        // This prevents the Dashboard from showing stale data (increased to 1000ms for reliability)
+        debugPrint('📦 [APPROVE] Cache cleared');
+        
+        // Wait for backend to process
         await Future.delayed(const Duration(milliseconds: 1000));
-        //  Notify parent (Dashboard) to refresh counts
+        debugPrint('⏳ [APPROVE] Waited 1000ms for backend');
+        
+        // 🔥 CRITICAL: Reload stores from backend to sync state
+        debugPrint(' [APPROVE] Reloading stores from backend...');
+        await _loadStores();
+        
+        // Notify parent to refresh dashboard counts
         widget.onStoreUpdated?.call();
+        debugPrint('🔔 [APPROVE] Parent notification sent');
       }
     } catch (e) {
+      debugPrint('❌ [APPROVE] Error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e'), backgroundColor: kAccentRed),
@@ -145,19 +184,25 @@ class _StoresManagementViewState extends State<StoresManagementView> with Single
 
   Future<void> _rejectStore(StoreRequest store) async {
     try {
-      await ApiService.suspendStore(store.id);
+      debugPrint(' [REJECT] Starting rejection for store: ${store.storeName} (ID: ${store.id})');
+      
+      await ApiService.rejectStore(store.id);
+      debugPrint(' [REJECT] API call successful');
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${store.storeName} suspended successfully'),
+            content: Text('${store.storeName} rejected'),
             backgroundColor: kAccentOrange,
           ),
         );
-        //  FIX: Create NEW StoreRequest with updated status = 'Suspended'
+        
+        //  OPTIMISTIC UPDATE: Change UI immediately
         setState(() {
+          debugPrint(' [REJECT] Updating local state - removing from approved');
           _approvedStores.removeWhere((s) => s.id == store.id);
-          //  Create a new object with the correct status
-          final suspendedStore = StoreRequest(
+          
+          final rejectedStore = StoreRequest(
             id: store.id,
             ownerUid: store.ownerUid,
             storeName: store.storeName,
@@ -166,19 +211,33 @@ class _StoresManagementViewState extends State<StoresManagementView> with Single
             email: store.email,
             storeIconUrl: store.storeIconUrl,
             storePhone: store.storePhone,
-            status: 'Suspended', //  Explicitly set to 'Suspended'
+            status: 'Rejected',
           );
-          _pendingStores.insert(0, suspendedStore);
+          _pendingStores.insert(0, rejectedStore);
+          debugPrint(' [REJECT] Added to pending stores. Total pending: ${_pendingStores.length}');
+          
+          // Switch to pending tab
+          _tabController.animateTo(1, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
         });
-        // Clear cache for next load
+        
+        // Clear cache
         ApiService.clearCache();
-        //  Wait for backend to update before notifying parent
-        // This prevents the Dashboard from showing stale data (increased to 1000ms for reliability)
+        debugPrint('📦 [REJECT] Cache cleared');
+        
+        // Wait for backend to process
         await Future.delayed(const Duration(milliseconds: 1000));
-        //  Notify parent (Dashboard) to refresh counts
+        debugPrint('⏳ [REJECT] Waited 1000ms for backend');
+        
+        // 🔥 CRITICAL: Reload stores from backend to sync state
+        debugPrint(' [REJECT] Reloading stores from backend...');
+        await _loadStores();
+        
+        // Notify parent to refresh dashboard counts
         widget.onStoreUpdated?.call();
+        debugPrint('🔔 [REJECT] Parent notification sent');
       }
     } catch (e) {
+      debugPrint('❌ [REJECT] Error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e'), backgroundColor: kAccentRed),
@@ -209,13 +268,18 @@ class _StoresManagementViewState extends State<StoresManagementView> with Single
             backgroundColor: kAccentGreen,
           ),
         );
-        //  Optimistic: remove from list
+        
+        // Remove from local list
         setState(() {
-          _approvedStores.removeWhere((s) => s.id == store.id);
-          _pendingStores.removeWhere((s) => s.id == store.id);
+          _allStores.removeWhere((s) => s.id == store.id);
         });
-        //  Only clear cache, don't reload (avoid race condition)
+        
+        // Reload to confirm
         ApiService.clearCache();
+        await Future.delayed(const Duration(milliseconds: 300));
+        await _loadStores();
+        
+        widget.onStoreUpdated?.call();
       }
     } catch (e) {
       if (mounted) {
@@ -290,7 +354,7 @@ class _StoresManagementViewState extends State<StoresManagementView> with Single
                   children: [
                     const Icon(Icons.pending_rounded, size: 18),
                     const SizedBox(width: 8),
-                    Text('Pending (${_pendingStores.length})'),
+                    Text('Pending & Rejected (${_pendingStores.length})'),
                   ],
                 ),
               ),
@@ -349,7 +413,7 @@ class _StoresManagementViewState extends State<StoresManagementView> with Single
           title: isApproved ? 'No Approved Stores' : 'No Pending Requests',
           message: isApproved
               ? 'There are no approved stores yet.'
-              : 'There are no pending store requests.',
+              : 'There are no pending or rejected store requests.',
         ),
       );
     }

@@ -17,16 +17,36 @@ export class Order {
     try {
       const {
         userId, storeId, totalPrice, status, shippingAddress,
-        paymentMethod, deliveryOption, items,
+        paymentMethod, deliveryOption, currency, items,
       } = orderData;
 
       await connection.beginTransaction();
 
+      // Get currency from products if not provided, default to USD
+      let finalCurrency = currency || 'USD';
+      if (!currency) {
+        try {
+          const [currencyRows] = await connection.execute(
+            `SELECT COALESCE(p.currency, 'USD') as currency
+             FROM products p
+             WHERE p.store_id = ?
+             LIMIT 1`,
+            [storeId]
+          );
+          if (currencyRows.length > 0) {
+            finalCurrency = currencyRows[0].currency || 'USD';
+          }
+        } catch (e) {
+          logger.warn('Could not fetch currency from products, using USD');
+          finalCurrency = 'USD';
+        }
+      }
+
       const [result] = await connection.execute(
         `INSERT INTO orders 
-         (user_id, store_id, total_price, status, shipping_address, payment_method, delivery_option, created_at) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
-        [userId, storeId, totalPrice, status || 'pending', shippingAddress, paymentMethod || null, deliveryOption || null]
+         (user_id, store_id, total_price, currency, status, shipping_address, payment_method, delivery_option, created_at) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+        [userId, storeId, totalPrice, finalCurrency, status || 'pending', shippingAddress, paymentMethod || null, deliveryOption || null]
       );
 
       const orderId = result.insertId;
@@ -53,6 +73,7 @@ export class Order {
         user_id: userId,
         store_id: storeId,
         total_price: totalPrice,
+        currency: finalCurrency,
         status: status || 'pending',
         shipping_address: shippingAddress,
         payment_method: paymentMethod,
@@ -76,12 +97,17 @@ export class Order {
     const connection = await pool.getConnection();
     try {
       const sql = `
-        SELECT o.id, o.user_id, o.store_id, o.total_price, o.status, o.shipping_address,
+        SELECT SQL_NO_CACHE o.id, o.user_id, o.store_id, o.total_price, o.currency, o.status, o.shipping_address,
           o.payment_method, o.delivery_option, o.driver_location, o.driver_id,
           DATE_FORMAT(o.created_at, '%Y-%m-%d %H:%i:%s') as created_at,
-          s.name as store_name
+          s.name as store_name,
+          dr.name as driver_name,
+          dr.phone as driver_phone,
+          dr.latitude as driver_latitude,
+          dr.longitude as driver_longitude
         FROM orders o
         LEFT JOIN stores s ON o.store_id = s.id
+        LEFT JOIN delivery_requests dr ON o.driver_id = CAST(dr.uid AS CHAR) COLLATE utf8mb4_unicode_ci
         ORDER BY o.created_at DESC
         LIMIT ${l}`;
 
@@ -98,7 +124,7 @@ export class Order {
     const connection = await pool.getConnection();
     try {
       const [rows] = await connection.execute(
-        `SELECT 
+        `SELECT SQL_NO_CACHE
           o.*,
           DATE_FORMAT(o.created_at, '%Y-%m-%d %H:%i:%s') as created_at_str,
           DATE_FORMAT(o.updated_at, '%Y-%m-%d %H:%i:%s') as updated_at_str,
@@ -218,8 +244,9 @@ export class Order {
     const connection = await pool.getConnection();
 
     try {
+      // First get the orders for pagination
       const sql = `
-        SELECT o.*, s.name as store_name 
+        SELECT SQL_NO_CACHE o.*, s.name as store_name 
         FROM orders o 
         LEFT JOIN stores s ON o.store_id = s.id
         WHERE o.user_id = ? 
@@ -227,6 +254,20 @@ export class Order {
         LIMIT ${l} OFFSET ${offset}`;
 
       const [rows] = await connection.execute(sql, [userId]);
+      
+      // For each order, fetch its items
+      for (const order of rows) {
+        const itemsSql = `
+          SELECT oi.id, oi.order_id, oi.product_id, oi.quantity, oi.price,
+                 p.name, p.description, p.image_url as imageUrl, p.category_id
+          FROM order_items oi
+          LEFT JOIN products p ON oi.product_id = p.id
+          WHERE oi.order_id = ?`;
+        
+        const [items] = await connection.execute(itemsSql, [order.id]);
+        order.items = items || [];
+      }
+      
       connection.release();
       return rows;
     } catch (error) {
@@ -243,16 +284,21 @@ export class Order {
 
     try {
       const sql = `
-        SELECT 
+        SELECT SQL_NO_CACHE
           o.id, o.user_id, o.store_id, o.total_price, o.status, o.shipping_address,
           o.payment_method, o.delivery_option, o.driver_id,
           DATE_FORMAT(o.created_at, '%Y-%m-%d %H:%i:%s') as created_at,
           o.driver_location,
           u.display_name as customerName,
           u.phone as customerPhone,
-          u.address as customerAddress
+          u.address as customerAddress,
+          dr.name as driver_name,
+          dr.phone as driver_phone,
+          dr.latitude as driver_latitude,
+          dr.longitude as driver_longitude
         FROM orders o
-        LEFT JOIN users u ON o.user_id = u.uid
+        LEFT JOIN users u ON o.user_id = u.uid COLLATE utf8mb4_unicode_ci
+        LEFT JOIN delivery_requests dr ON o.driver_id = CAST(dr.uid AS CHAR) COLLATE utf8mb4_unicode_ci
         WHERE o.store_id = ?
         ORDER BY o.created_at DESC
         LIMIT ${l} OFFSET ${offset}`;
@@ -299,7 +345,7 @@ export class Order {
     try {
       const sql = `
         SELECT 
-          o.id, o.user_id, o.store_id, o.total_price, o.status,
+          o.id, o.user_id, o.store_id, o.total_price, o.currency, o.status,
           o.shipping_address, o.delivery_option, o.driver_id,
           o.current_offer_driver_id, o.offer_expires_at, o.skipped_driver_ids,
           s.name as store_name,
@@ -431,7 +477,8 @@ export class Order {
            u.display_name as customer_name, u.phone as customer_phone,
            u.latitude as customer_latitude, u.longitude as customer_longitude,
            u.address as customer_address, u.delivery_instructions,
-           u.building_info, u.apartment_number
+           u.building_info, u.apartment_number,
+           COALESCE(o.currency, 'USD') as currency
          FROM orders o
          LEFT JOIN stores s ON o.store_id = s.id
          LEFT JOIN users u ON o.user_id = u.uid
@@ -453,6 +500,7 @@ export class Order {
         store_id: r.store_id,
         total_price: r.total_price,
         total: r.total_price,
+        currency: r.currency || 'USD',
         status: _mapStatus(r.status),
         shipping_address: r.shipping_address,
         delivery_option: r.delivery_option,
@@ -493,7 +541,7 @@ export class Order {
     try {
       const l = Number(limit) || 10;
       const sql = `
-        SELECT o.id, o.user_id, o.store_id, o.total_price, o.status, o.shipping_address,
+        SELECT o.id, o.user_id, o.store_id, o.total_price, COALESCE(o.currency, 'USD') as currency, o.status, o.shipping_address,
           o.delivery_option, 
           u.latitude as customer_latitude, u.longitude as customer_longitude,
           s.name as store_name, s.latitude as store_latitude, s.longitude as store_longitude,
@@ -611,7 +659,7 @@ export class Order {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // 📊 DRIVER HISTORY
+  //  DRIVER HISTORY
   // ═══════════════════════════════════════════════════════════════════════════
 
   static async findCompletedByDriverId(driverId, options = {}) {

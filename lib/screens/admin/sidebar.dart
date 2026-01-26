@@ -7,7 +7,7 @@ import 'package:shimmer/shimmer.dart';
 import '../../widgets/welcoming_page_shimmer.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 🎯 MODERN ADMIN SIDEBAR - Apple-Inspired Navigation
+//  MODERN ADMIN SIDEBAR - Apple-Inspired Navigation
 // ═══════════════════════════════════════════════════════════════════════════════
 
 class AdminSidebar extends StatefulWidget {

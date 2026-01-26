@@ -21,6 +21,9 @@ export async function login(req, res, next) {
 
     const payload = { id: admin.id, email: admin.email, role: admin.role };
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+    
+    console.log('[AdminAuthController.login] Admin logged in:', admin.email, 'Role:', admin.role);
+    console.log('[AdminAuthController.login] Token created with payload:', payload);
 
     return res.json({ success: true, data: { id: admin.id, email: admin.email, role: admin.role, first_name: admin.first_name, last_name: admin.last_name }, token });
   } catch (err) {

@@ -1,9 +1,12 @@
 // lib/screens/stores_list_view.dart
 
 import 'package:flutter/material.dart';
+import 'dart:ui' as ui;
 import 'package:provider/provider.dart';
 import '../../state_management/cart_manager.dart';
+import '../../state_management/theme_manager.dart';
 import '../../services/api_service.dart'; //  استخدام API
+import '../auth/sign_in_ui.dart'; // LuxuryTheme
 
 // استيراد الشاشات والمكونات
 import '../stores/store_detail_view.dart';
@@ -67,25 +70,22 @@ class _StoresListViewState extends State<StoresListView> {
 
   // MARK: - Widgets
 
-  Widget _buildLoadingIndicator(BuildContext context) {
-    final Color accentColor = Theme.of(context).colorScheme.secondary;
-
+  Widget _buildLoadingIndicator(BuildContext context, bool isDark) {
     return Positioned.fill(
       child: Container(
-        color: Theme.of(context).scaffoldBackgroundColor.withOpacity(0.5),
-        child: Center(
+        color: isDark 
+            ? Colors.black.withOpacity(0.4)
+            : Colors.white.withOpacity(0.4),
+        child: const Center(
           child: CircularProgressIndicator(
-            color: accentColor,
+            color: LuxuryTheme.kLightBlueAccent,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildEmptyStateView(BuildContext context) {
-    final Color primaryColor = Theme.of(context).colorScheme.primary;
-    final Color secondaryColor = Theme.of(context).colorScheme.onSurface.withOpacity(0.6);
-
+  Widget _buildEmptyStateView(BuildContext context, Color textColor, Color secondaryText) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 80.0),
       child: Center(
@@ -95,15 +95,17 @@ class _StoresListViewState extends State<StoresListView> {
             Icon(
               Icons.storefront,
               size: 60,
-              color: secondaryColor.withOpacity(0.3),
+              color: secondaryText.withOpacity(0.4),
             ),
             const SizedBox(height: 20),
             Text(
               "No Stores Available",
               style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: primaryColor,
+                fontFamily: 'Didot',
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                color: textColor,
+                letterSpacing: 0.3,
               ),
             ),
             const SizedBox(height: 5),
@@ -112,8 +114,10 @@ class _StoresListViewState extends State<StoresListView> {
               child: Text(
                 "We couldn't find any ${widget.categoryName.toLowerCase()} stores in your area.",
                 style: TextStyle(
+                  fontFamily: 'TenorSans',
                   fontSize: 14,
-                  color: secondaryColor,
+                  color: secondaryText,
+                  fontWeight: FontWeight.w400,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -141,17 +145,25 @@ class _StoresListViewState extends State<StoresListView> {
   // MARK: - Main Build Method
   @override
   Widget build(BuildContext context) {
-    final Color primaryColor = Theme.of(context).colorScheme.primary;
-    final Color scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
+    final themeManager = Provider.of<ThemeManager>(context);
+    final isDark = themeManager.isDarkMode;
+    
+    // Luxury Colors
+    final bgColor = isDark ? LuxuryTheme.kDarkBackground : LuxuryTheme.kLightBackground;
+    final textColor = isDark ? LuxuryTheme.kPlatinum : LuxuryTheme.kDeepNavy;
+    final secondaryText = isDark ? LuxuryTheme.kPlatinum.withOpacity(0.7) : LuxuryTheme.kDeepNavy.withOpacity(0.7);
 
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: scaffoldColor,
+      backgroundColor: bgColor,
+      extendBodyBehindAppBar: true,
       drawer: const Drawer(child: SideMenuViewContents()),
       endDrawer: const Drawer(child: SideCartViewContents()),
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: primaryColor),
+          icon: Icon(Icons.arrow_back, color: textColor),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: GestureDetector(
@@ -161,8 +173,9 @@ class _StoresListViewState extends State<StoresListView> {
             style: TextStyle(
               fontFamily: 'CinzelDecorative',
               fontSize: 28,
-              color: primaryColor,
+              color: textColor,
               fontWeight: FontWeight.w900,
+              letterSpacing: 1.5,
             ),
           ),
         ),
@@ -173,92 +186,108 @@ class _StoresListViewState extends State<StoresListView> {
           ),
         ],
       ),
-      body: Stack(
-        children: [
-          SingleChildScrollView(
-            child: Column(
-              children: [
-                _buildWebContainer(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Content Header
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 30.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.categoryName,
-                              style: TextStyle(
-                                fontSize: 34,
-                                fontWeight: FontWeight.bold,
-                                color: primaryColor,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              "${_stores.length} locations available",
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Store Grid
-                      if (_stores.isEmpty && !_isLoading)
-                        _buildEmptyStateView(context)
-                      else if (_stores.isNotEmpty)
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: isDark
+                ? [const Color(0xFF0A0A0A), const Color(0xFF0A0A0A), const Color(0xFF1A1A1A)]
+                : [const Color(0xFFF5F5F5), const Color(0xFFF5F5F5), const Color(0xFFE8E8E8)],
+            stops: const [0.0, 1.8, 1.1],
+          ),
+        ),
+        child: Stack(
+          children: [
+            SingleChildScrollView(
+              child: Column(
+                children: [
+                  _buildWebContainer(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Content Header
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                          child: GridView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                              maxCrossAxisExtent: 250,
-                              crossAxisSpacing: 20,
-                              mainAxisSpacing: 20,
-                              childAspectRatio: 0.8,
-                            ),
-                            itemCount: _stores.length,
-                            itemBuilder: (context, index) {
-                              final store = _stores[index];
-                              return StoreCard(
-                                store: store,
-                                onTap: () {
-                                  Navigator.of(context).push(
-                                    PageRouteBuilder(
-                                      pageBuilder: (context, animation, secondaryAnimation) =>
-                                          StoreDetailView(store: store),
-                                      transitionsBuilder:
-                                          (context, animation, secondaryAnimation, child) {
-                                        return FadeTransition(
-                                          opacity: animation.drive(Tween(begin: 0.0, end: 1.0)),
-                                          child: child,
-                                        );
-                                      },
-                                      transitionDuration: const Duration(milliseconds: 200),
-                                    ),
-                                  );
-                                },
-                              );
-                            },
+                          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 100),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                widget.categoryName,
+                                style: TextStyle(
+                                  fontFamily: 'Didot',
+                                  fontSize: 36,
+                                  fontWeight: FontWeight.w600,
+                                  color: textColor,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                "${_stores.length} locations available",
+                                style: TextStyle(
+                                  fontFamily: 'TenorSans',
+                                  fontSize: 14,
+                                  color: secondaryText,
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      const SizedBox(height: 30),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
 
-          // Loading Indicator
-          if (_isLoading) _buildLoadingIndicator(context),
-        ],
+                        // Store Grid
+                        if (_stores.isEmpty && !_isLoading)
+                          _buildEmptyStateView(context, textColor, secondaryText)
+                        else if (_stores.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                            child: GridView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                                maxCrossAxisExtent: 250,
+                                crossAxisSpacing: 20,
+                                mainAxisSpacing: 20,
+                                childAspectRatio: 0.8,
+                              ),
+                              itemCount: _stores.length,
+                              itemBuilder: (context, index) {
+                                final store = _stores[index];
+                                return StoreCard(
+                                  store: store,
+                                  onTap: () {
+                                    Navigator.of(context).push(
+                                      PageRouteBuilder(
+                                        pageBuilder: (context, animation, secondaryAnimation) =>
+                                            StoreDetailView(store: store),
+                                        transitionsBuilder:
+                                            (context, animation, secondaryAnimation, child) {
+                                          return FadeTransition(
+                                            opacity: animation.drive(Tween(begin: 0.0, end: 1.0)),
+                                            child: child,
+                                          );
+                                        },
+                                        transitionDuration: const Duration(milliseconds: 200),
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
+                            ),
+                          ),
+                        const SizedBox(height: 30),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Loading Indicator
+            if (_isLoading) _buildLoadingIndicator(context, isDark),
+          ],
+        ),
       ),
     );
   }

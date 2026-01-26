@@ -31,6 +31,7 @@ class ProductSS {
   final String status;
   final bool approved;
   final String? currency;
+  final String? categoryName;
 
   ProductSS({
     required this.id,
@@ -46,6 +47,7 @@ class ProductSS {
     required this.status,
     required this.approved,
     this.currency,
+    this.categoryName,
   });
 
   //  Factory من API Response (MySQL)
@@ -64,6 +66,7 @@ class ProductSS {
       status: data['status'] as String? ?? 'pending',
       approved: data['status'] == 'approved',
       currency: data['currency'] as String? ?? 'USD',
+      categoryName: data['category_name'] as String?,
     );
   }
 }
@@ -100,7 +103,7 @@ class _StoreProductsViewState extends State<StoreProductsView> {
   void initState() {
     super.initState();
     final storeId = widget.storeId;
-    debugPrint('📱 StoreProductsView INIT: storeId=$storeId, embedInAdmin=${widget.embedInAdmin}');
+    debugPrint(' StoreProductsView INIT: storeId=$storeId, embedInAdmin=${widget.embedInAdmin}');
     _fetchProducts();
     //  Start polling every 1.5 seconds to check for product updates (faster response)
     _pollingTimer = Timer.periodic(const Duration(milliseconds: 1500), (_) {
@@ -475,25 +478,80 @@ class _StoreProductsViewState extends State<StoreProductsView> {
       );
     }
 
+    // تجميع المنتجات حسب الـ category وترتيبها أبجديا
+    final Map<String, List<ProductSS>> groupedByCategory = {};
+    for (final product in filteredProducts) {
+      final categoryName = product.categoryName ?? 'Uncategorized';
+      groupedByCategory.putIfAbsent(categoryName, () => []);
+      groupedByCategory[categoryName]!.add(product);
+    }
+
+    // ترتيب الـ categories أبجديا
+    final sortedCategories = groupedByCategory.keys.toList()..sort();
+
     final role = ApiService.cachedAdminRole?.toLowerCase() ?? 'admin';
-    return GridView.builder(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: crossAxisCount,
-        crossAxisSpacing: 16.0,
-        mainAxisSpacing: 16.0,
-        childAspectRatio: 0.75,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ...sortedCategories.map((category) {
+            final productsInCategory = groupedByCategory[category]!;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Category Header
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 16, 8, 12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: kCardBackground,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: const Color(0xFF42A5F5),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Text(
+                      category,
+                      style: const TextStyle(
+                        color: Color(0xFF42A5F5),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ),
+                ),
+                // Products Grid for this category
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: EdgeInsets.zero,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossAxisCount,
+                    crossAxisSpacing: 16.0,
+                    mainAxisSpacing: 16.0,
+                    childAspectRatio: 0.75,
+                  ),
+                  itemCount: productsInCategory.length,
+                  itemBuilder: (context, index) {
+                    final product = productsInCategory[index];
+                    return _ProductCardView(
+                      product: product,
+                      onTap: () => _showProductDetails(context, product),
+                      onApprove: role == 'user' ? null : () => _updateProductStatus(product, status: 'approved'),
+                      onReject: role == 'user' ? null : () => _deleteProduct(product),
+                    );
+                  },
+                ),
+                const SizedBox(height: 8),
+              ],
+            );
+          }).toList(),
+        ],
       ),
-      itemCount: filteredProducts.length,
-      itemBuilder: (context, index) {
-        final product = filteredProducts[index];
-        return _ProductCardView(
-          product: product,
-          onTap: () => _showProductDetails(context, product),
-          onApprove: role == 'user' ? null : () => _updateProductStatus(product, status: 'approved'),
-          onReject: role == 'user' ? null : () => _deleteProduct(product),
-        );
-      },
     );
   }
 }

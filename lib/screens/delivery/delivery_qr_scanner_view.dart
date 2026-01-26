@@ -1,6 +1,6 @@
 // lib/screens/delivery_qr_scanner_view.dart
 // ═══════════════════════════════════════════════════════════════════════════════
-// 📱 QR SCANNER VIEW - Scan order QR at store pickup
+//  QR SCANNER VIEW - Scan order QR at store pickup
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import 'package:flutter/material.dart';
@@ -89,7 +89,7 @@ class _QRScannerViewState extends State<QRScannerView> with SingleTickerProvider
     if (scannedValue == null) return;
 
     debugPrint(' Scanned: $scannedValue');
-    debugPrint('🎯 Expected Order ID: ${widget.orderId}');
+    debugPrint(' Expected Order ID: ${widget.orderId}');
 
     // Check if scanned value matches order ID
     // Support multiple formats: just ID, "ORDER-ID", or full JSON

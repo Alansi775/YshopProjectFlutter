@@ -1,18 +1,10 @@
-import admin from 'firebase-admin';
-import dotenv from 'dotenv';
-
-dotenv.config();
+// Firebase has been completely removed from this project
+// All authentication is now handled by our backend server with JWT tokens
+// No Firebase dependencies
 
 let auth = null;
 let firebaseInitialized = false;
-let initializationAttempted = false; //  Prevent repeated initialization attempts
-
-//  DISABLED: Firebase Admin initialization
-// All store operations use MySQL API only
-// Firestore sync is disabled - no need to initialize Firebase
-console.log('⚠️ Firebase Admin initialization DISABLED - Using MySQL API only');
-firebaseInitialized = false;
-initializationAttempted = true;
+let initializationAttempted = true;
 
 export { auth, firebaseInitialized, initializationAttempted };
-export default admin;
+export default null;

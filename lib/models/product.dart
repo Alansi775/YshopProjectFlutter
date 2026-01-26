@@ -1,6 +1,5 @@
 // lib/models/product.dart
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/api_service.dart';
 
 class Product {
@@ -42,29 +41,7 @@ class Product {
     this.currency,
   });
 
-  // Factory for Firestore (legacy)
-  factory Product.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    return Product(
-      id: doc.id,
-      name: data['name'] ?? 'Unknown Product',
-      description: data['description'] ?? '',
-      price: (data['price'] ?? 0).toDouble(),
-      storeId: data['storeId'] ?? '',
-      storeName: data['storeName'],
-      storePhone: data['storePhone'],
-      categoryId: data['categoryId'],
-      stock: data['stock'] ?? 0,
-      imageUrl: data['imageUrl'] ?? '',
-      videoUrl: data['videoUrl'],
-      imageUrls: List<String>.from(data['imageUrls'] ?? []),
-      isActive: data['isActive'] ?? true,
-      status: data['status'] ?? 'approved',
-      storeOwnerEmail: data['storeOwnerEmail'],
-    );
-  }
-
-  //  Factory for backend API (MySQL)
+  // Factory for backend API (MySQL)
   factory Product.fromJson(Map<String, dynamic> json) {
     // تحويل المسار النسبي إلى URL كامل
     String imageUrl = json['image_url'] as String? ?? '';
